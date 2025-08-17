@@ -9,7 +9,7 @@ This project is currently under active development. The binder is functional and
 ## 💡 Features
 
 * **Multi-Source Binding**: Binds data from different HTTP request sources (query strings, form data, JSON, URL parameters, headers, and cookies) to a single Go struct.
-* **Struct Tag-Based Configuration**: Uses simple struct tags (e.g., `query`, `multipart`, `json`, `urlparam`, `header`, `cookie`) to map data fields.
+* **Struct Tag-Based Configuration**: Uses simple struct tags (e.g., `query`, `multipart`, `json`, `param`, `header`, `cookie`) to map data fields.
 * **Automatic Type Conversion**: Automatically converts string values from the request into the appropriate Go types (integers, floats, booleans, time, etc.).
 * **Nested Struct Support**: Recursively binds data to nested structs and pointers to structs.
 * **File Uploads**: Handles single and multiple file uploads seamlessly.
