@@ -1,0 +1,16 @@
+- name: tag
+  values:
+    - key: query
+      value: "query"
+    - key: urlParam
+      value: "param"
+    - key: header
+      value: "header"
+    - key: cookie
+      value: "cookie"
+    - key: json
+      value: "json"
+    - key: form
+      value: "form"
+    - key: multipartForm
+      value: "multipart"
