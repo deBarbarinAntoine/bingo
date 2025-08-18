@@ -13,7 +13,7 @@ type Form struct {
 func fetchFormData(bind *dataBind, src any) error {
 	r, ok := src.(*http.Request)
 	if !ok || r == nil {
-		return ErrInvalidSrc
+		return ErrInvalidSrcType("*http.Request")
 	}
 	
 	err := r.ParseForm()
@@ -27,7 +27,7 @@ func fetchFormData(bind *dataBind, src any) error {
 	return nil
 }
 
-// NewForm now uses functional options.
+// NewForm uses functional options.
 //
 // Example usage:
 // 		q, err := NewForm(&myStruct, &request) // uses default
@@ -40,7 +40,7 @@ func NewForm(dst any, src *http.Request, opts ...BindOption) (*Form, error) {
 	}
 	
 	if src == nil {
-		return nil, ErrInvalidSrc
+		return nil, ErrInvalidSrcType("*http.Request")
 	}
 	
 	form := &Form{

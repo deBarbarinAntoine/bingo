@@ -19,14 +19,10 @@ type Cookie struct {
 func fetchCookieData(bind *dataBind, src any) error {
 	r, ok := src.(*http.Request)
 	if !ok || r == nil {
-		return ErrInvalidSrc
+		return ErrInvalidSrcType("*http.Request")
 	}
-	
 	// Get all tags from the destination struct
-	err := bind.getTags()
-	if err != nil {
-		return err
-	}
+	bind.getTags()
 	
 	cookies := r.Cookies()
 	
@@ -46,7 +42,7 @@ func fetchCookieData(bind *dataBind, src any) error {
 	return nil
 }
 
-// NewCookie now uses functional options.
+// NewCookie uses functional options.
 //
 // Example usage:
 // 		q, err := NewCookie(&myStruct, &request) // uses default
@@ -57,7 +53,7 @@ func NewCookie(dst any, src *http.Request, opts ...BindOption) (*Cookie, error) 
 		return nil, ErrInvalidDst
 	}
 	if src == nil {
-		return nil, ErrInvalidSrc
+		return nil, ErrInvalidSrcType("*http.Request")
 	}
 	form := &Cookie{
 		dataBind: dataBind{

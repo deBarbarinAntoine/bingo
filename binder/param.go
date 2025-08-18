@@ -13,13 +13,10 @@ type UrlParam struct {
 func fetchUrlParamData(bind *dataBind, src any) error {
 	r, ok := src.(*http.Request)
 	if !ok || r == nil {
-		return ErrInvalidSrc
+		return ErrInvalidSrcType("*http.Request")
 	}
-	
-	err := bind.getTags()
-	if err != nil {
-		return err
-	}
+	// Get all tags from the destination struct
+	bind.getTags()
 	
 	for k := range bind.data {
 		if v := r.PathValue(k); v != "" {
@@ -30,7 +27,7 @@ func fetchUrlParamData(bind *dataBind, src any) error {
 	return nil
 }
 
-// NewUrlParam now uses functional options.
+// NewUrlParam uses functional options.
 //
 // Example usage:
 // 		q, err := NewUrlParam(&myStruct, &request) // uses default
@@ -41,7 +38,7 @@ func NewUrlParam(dst any, src *http.Request, opts ...BindOption) (*UrlParam, err
 		return nil, ErrInvalidDst
 	}
 	if src == nil {
-		return nil, ErrInvalidSrc
+		return nil, ErrInvalidSrcType("*http.Request")
 	}
 	form := &UrlParam{
 		dataBind: dataBind{

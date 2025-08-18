@@ -14,7 +14,7 @@ type JSON struct {
 func fetchJSONData(bind *dataBind, src any) error {
 	r, ok := src.(*http.Request)
 	if !ok || r == nil {
-		return ErrInvalidSrc
+		return ErrInvalidSrcType("*http.Request")
 	}
 	
 	if err := json.NewDecoder(r.Body).Decode(bind.DataDist); err != nil {
@@ -24,7 +24,7 @@ func fetchJSONData(bind *dataBind, src any) error {
 	return nil
 }
 
-// NewJSON now uses functional options.
+// NewJSON uses functional options.
 //
 // Example usage:
 // 		q, err := NewJSON(&myStruct, &request) // uses default
@@ -37,7 +37,7 @@ func NewJSON(dst any, src *http.Request, opts ...BindOption) (*JSON, error) {
 	}
 	
 	if src == nil {
-		return nil, ErrInvalidSrc
+		return nil, ErrInvalidSrcType("*http.Request")
 	}
 	
 	form := &JSON{

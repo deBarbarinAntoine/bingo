@@ -13,8 +13,10 @@ type Query struct {
 func fetchQueryData(bind *dataBind, src any) error {
 	query, ok := src.(url.Values)
 	if !ok {
-		return ErrInvalidSrc
+		return ErrInvalidSrcType("url.Values")
 	}
+	// Get all tags from the destination struct
+	bind.getTags()
 	
 	for k, v := range query {
 		if _, ok := bind.data[k]; ok {
@@ -29,7 +31,7 @@ func fetchQueryData(bind *dataBind, src any) error {
 	return nil
 }
 
-// NewQuery now uses functional options.
+// NewQuery uses functional options.
 //
 // Example usage:
 // 		q, err := NewQuery(&myStruct, urlValues) // uses default
@@ -42,7 +44,7 @@ func NewQuery(dst any, src url.Values, opts ...BindOption) (*Query, error) {
 	}
 	
 	if src == nil {
-		return nil, ErrInvalidSrc
+		return nil, ErrInvalidSrcType("url.Values")
 	}
 	
 	query := &Query{

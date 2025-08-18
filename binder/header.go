@@ -13,13 +13,10 @@ type Header struct {
 func fetchHeaderData(bind *dataBind, src any) error {
 	r, ok := src.(*http.Request)
 	if !ok || r == nil {
-		return ErrInvalidSrc
+		return ErrInvalidSrcType("*http.Request")
 	}
-	
-	err := bind.getTags()
-	if err != nil {
-		return err
-	}
+	// Get all tags from the destination struct
+	bind.getTags()
 	
 	for k := range bind.data {
 		if v := r.Header.Values(k); v != nil {
@@ -34,7 +31,7 @@ func fetchHeaderData(bind *dataBind, src any) error {
 	return nil
 }
 
-// NewHeader now uses functional options.
+// NewHeader uses functional options.
 //
 // Example usage:
 // 		q, err := NewHeader(&myStruct, &request) // uses default
@@ -45,7 +42,7 @@ func NewHeader(dst any, src *http.Request, opts ...BindOption) (*Header, error) 
 		return nil, ErrInvalidDst
 	}
 	if src == nil {
-		return nil, ErrInvalidSrc
+		return nil, ErrInvalidSrcType("*http.Request")
 	}
 	form := &Header{
 		dataBind: dataBind{

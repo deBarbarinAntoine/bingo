@@ -13,7 +13,7 @@ type MultipartForm struct {
 func fetchMultipartFormData(bind *dataBind, src any) error {
 	r, ok := src.(*http.Request)
 	if !ok || r == nil {
-		return ErrInvalidSrc
+		return ErrInvalidSrcType("*http.Request")
 	}
 	
 	// r.ParseMultipartForm populates both Form and PostForm.
@@ -41,7 +41,7 @@ func fetchMultipartFormData(bind *dataBind, src any) error {
 	return nil
 }
 
-// NewMultipartForm now uses functional options.
+// NewMultipartForm uses functional options.
 //
 // Example usage:
 // 		q, err := NewMultipartForm(&myStruct, &request) // uses default
@@ -54,7 +54,7 @@ func NewMultipartForm(dst any, src *http.Request, opts ...BindOption) (*Multipar
 	}
 	
 	if src == nil {
-		return nil, ErrInvalidSrc
+		return nil, ErrInvalidSrcType("*http.Request")
 	}
 	
 	form := &MultipartForm{
