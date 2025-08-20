@@ -1,3 +1,4 @@
+// bind.go
 package binder
 
 import (
@@ -66,6 +67,7 @@ func bindPrimitiveValue(fieldValue reflect.Value, mapValue any) error {
 	
 	case reflect.String:
 		fieldValue.SetString(stringValue)
+		return nil
 	
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return bindInt(stringValue, fieldValue)
@@ -80,10 +82,12 @@ func bindPrimitiveValue(fieldValue reflect.Value, mapValue any) error {
 		return bindBool(stringValue, fieldValue)
 	
 	case reflect.Struct:
-		err := bindTime(stringValue, fieldValue)
-		if err != nil {
+		// If the struct is a time.Time type, parse the string value and set the field value
+		if err := bindTime(stringValue, fieldValue); err != nil {
 			return err
 		}
+		// DEBUG: Return nil anyway -> may cause silent errors
+		return nil
 	
 	default:
 	}

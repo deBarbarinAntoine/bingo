@@ -2,52 +2,55 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"time"
 	
-	"BinGo/binder"
+	"BinGo/bingo"
+	"BinGo/router"
+	
+	"github.com/rs/zerolog/hlog"
 )
 
 type Publication struct {
-	Title string    `multipart:"title"`
-	Score float64   `multipart:"score"`
-	Date  time.Time `multipart:"date"`
+	Title string    `multipart:"title" json:"title"`
+	Score float64   `multipart:"score" json:"score"`
+	Date  time.Time `multipart:"date" json:"date"`
 }
 
 type Info struct {
-	Id           uint          `multipart:"id"`
-	Publications []Publication `multipart:"publications"`
+	Id           uint          `multipart:"id" json:"id"`
+	Publications []Publication `multipart:"publications" json:"publications"`
 }
 
 type Data struct {
-	Name    string                `multipart:"name"`
-	Age     int                   `multipart:"age"`
-	IsAdmin bool                  `multipart:"is_admin"`
-	Score   float64               `multipart:"score"`
-	Info    Info                  `multipart:"info"`
-	File    *multipart.FileHeader `multipart:"file"`
+	Session   string                `cookie:"session" json:"session"`
+	CSRFToken string                `header:"x-csrf-token" json:"x-csrf-token"`
+	Id        uint                  `param:"id" json:"id"`
+	Name      string                `query:"name" json:"name"`
+	Age       int                   `multipart:"age" json:"age"`
+	IsAdmin   bool                  `multipart:"is_admin" json:"is_admin"`
+	Score     float64               `multipart:"score" json:"score"`
+	Info      Info                  `multipart:"info" json:"info"`
+	File      *multipart.FileHeader `multipart:"file" json:"file"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	var data = &Data{}
-	query, err := binder.NewMultipartForm(data, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	data, ok := router.GetCtxData(r.Context(), "data").(*Data)
+	if !ok {
+		http.Error(w, "no data", http.StatusInternalServerError)
 		return
 	}
-	err = query.Fetch()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	hlog.FromRequest(r).Info().Msg("Request received successfully")
 	
 	if data.File != nil {
-		fmt.Printf("%d bytes of file uploaded: %s\n", data.File.Size, data.File.Filename)
+		hlog.FromRequest(r).Info().
+			Int64("file_size", data.File.Size).
+			Str("file_name", data.File.Filename).
+			Msg("File uploaded successfully")
 	} else {
-		fmt.Println("No file uploaded")
+		hlog.FromRequest(r).Error().Msg("No file uploaded")
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
@@ -57,6 +60,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 //go:generate go run github.com/debarbarinantoine/go-enum-generate
 func main() {
-	http.HandleFunc("POST /", handler)
-	log.Fatal(http.ListenAndServe(":8008", nil))
+	srv := bingo.New("localhost:8008", "localhost:6379", "development").
+		WithLogMiddleware().
+		WithSessionMiddleware()
+	
+	srv.Mux.WithMultipartFormBindCtx("/:id", handler, &Data{}, "data", http.MethodPost)
+	log.Fatal(srv.ListenAndServe())
 }

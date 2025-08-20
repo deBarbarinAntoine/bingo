@@ -1,3 +1,4 @@
+// multibinder.go
 package binder
 
 import (
@@ -16,29 +17,80 @@ type MultiBinder struct {
 	JSONBinder          *JSON
 }
 
-type MultiBinderOption func(binder *MultiBinder)
+type MultiBinderOption func(mb *MultiBinder)
 
-func WithCustomBinder(customBinder *DataBinder) MultiBinderOption {
-	myCustomBinder := any(customBinder)
-	return func(binder *MultiBinder) {
-		switch myCustomBinder.(type) {
-		case *Query:
-			binder.QueryBinder = myCustomBinder.(*Query)
-		case *Form:
-			binder.FormBinder = myCustomBinder.(*Form)
-		case *MultipartForm:
-			binder.MultipartFormBinder = myCustomBinder.(*MultipartForm)
-		case *UrlParam:
-			binder.UrlParamBinder = myCustomBinder.(*UrlParam)
-		case *Header:
-			binder.HeaderBinder = myCustomBinder.(*Header)
-		case *Cookie:
-			binder.CookieBinder = myCustomBinder.(*Cookie)
-		case *JSON:
-			binder.JSONBinder = myCustomBinder.(*JSON)
-		default:
-			// do nothing
-		}
+func WithBodyBinder(tag enum.Tag) []MultiBinderOption {
+	binderOptions := make([]MultiBinderOption, 0, 3)
+	switch tag {
+	case enum.Tags.Form:
+		binderOptions = append(binderOptions, WithoutMultipartFormBinder(), WithoutJSONBinder())
+	case enum.Tags.MultipartForm:
+		binderOptions = append(binderOptions, WithoutFormBinder(), WithoutJSONBinder())
+	case enum.Tags.Json:
+		binderOptions = append(binderOptions, WithoutMultipartFormBinder(), WithoutFormBinder())
+	default:
+		return nil
+	}
+	return binderOptions
+}
+
+func WithCustomQueryBinder(customBinder *Query) MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.QueryBinder = customBinder
+	}
+}
+
+func WithCustomMultipartBinder(customBinder *MultipartForm) MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.MultipartFormBinder = customBinder
+	}
+}
+
+func WithCustomFormBinder(customBinder *Form) MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.FormBinder = customBinder
+	}
+}
+
+func WithCustomUrlParamBinder(customBinder *UrlParam) MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.UrlParamBinder = customBinder
+	}
+}
+
+func WithCustomHeaderBinder(customBinder *Header) MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.HeaderBinder = customBinder
+	}
+}
+
+func WithCustomCookieBinder(customBinder *Cookie) MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.CookieBinder = customBinder
+	}
+}
+
+func WithCustomJSONBinder(customBinder *JSON) MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.JSONBinder = customBinder
+	}
+}
+
+func WithoutJSONBinder() MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.JSONBinder = nil
+	}
+}
+
+func WithoutFormBinder() MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.FormBinder = nil
+	}
+}
+
+func WithoutMultipartFormBinder() MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.MultipartFormBinder = nil
 	}
 }
 
@@ -51,7 +103,7 @@ func WithCustomBinder(customBinder *DataBinder) MultiBinderOption {
 // 		if err != nil {
 // 			panic(err)
 // 		}
-// 		q, err := NewMultiBinder(&myStruct, &request, WithCustomBinder(myCustomBinder)) // uses custom
+// 		q, err := NewMultiBinder(&myStruct, &request, WithCustomUrlParamBinder(myCustomBinder)) // uses custom
 func NewMultiBinder(dst any, src *http.Request, opts ...MultiBinderOption) (*MultiBinder, error) {
 	
 	err := checkDst(dst)
@@ -78,80 +130,80 @@ func NewMultiBinder(dst any, src *http.Request, opts ...MultiBinderOption) (*Mul
 	return binder, nil
 }
 
-func (binder *MultiBinder) createBinders(dst any, src *http.Request) error {
+func (mb *MultiBinder) createBinders(dst any, src *http.Request) error {
 	presentTags := hasTags(dst)
 	var err error
 	if _, ok := presentTags[enum.Tags.Query]; ok {
-		if binder.QueryBinder, err = NewQuery(dst, src.URL.Query()); err != nil {
+		if mb.QueryBinder, err = NewQuery(dst, src.URL.Query()); err != nil {
 			return err
 		}
 	}
 	if _, ok := presentTags[enum.Tags.Form]; ok {
-		if binder.FormBinder, err = NewForm(dst, src); err != nil {
+		if mb.FormBinder, err = NewForm(dst, src); err != nil {
 			return err
 		}
 	}
 	if _, ok := presentTags[enum.Tags.MultipartForm]; ok {
-		if binder.MultipartFormBinder, err = NewMultipartForm(dst, src); err != nil {
+		if mb.MultipartFormBinder, err = NewMultipartForm(dst, src); err != nil {
 			return err
 		}
 	}
 	if _, ok := presentTags[enum.Tags.UrlParam]; ok {
-		if binder.UrlParamBinder, err = NewUrlParam(dst, src); err != nil {
+		if mb.UrlParamBinder, err = NewUrlParam(dst, src); err != nil {
 			return err
 		}
 	}
 	if _, ok := presentTags[enum.Tags.Header]; ok {
-		if binder.HeaderBinder, err = NewHeader(dst, src); err != nil {
+		if mb.HeaderBinder, err = NewHeader(dst, src); err != nil {
 			return err
 		}
 	}
 	if _, ok := presentTags[enum.Tags.Cookie]; ok {
-		if binder.CookieBinder, err = NewCookie(dst, src); err != nil {
+		if mb.CookieBinder, err = NewCookie(dst, src); err != nil {
 			return err
 		}
 	}
 	if _, ok := presentTags[enum.Tags.Json]; ok {
-		if binder.JSONBinder, err = NewJSON(dst, src); err != nil {
+		if mb.JSONBinder, err = NewJSON(dst, src); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (binder *MultiBinder) Fetch() error {
-	if binder.UrlParamBinder != nil {
-		if err := binder.UrlParamBinder.Fetch(); err != nil {
+func (mb *MultiBinder) Fetch() error {
+	if mb.JSONBinder != nil {
+		if err := mb.JSONBinder.Fetch(); err != nil {
 			return err
 		}
 	}
-	if binder.HeaderBinder != nil {
-		if err := binder.HeaderBinder.Fetch(); err != nil {
+	if mb.FormBinder != nil {
+		if err := mb.FormBinder.Fetch(); err != nil {
 			return err
 		}
 	}
-	if binder.CookieBinder != nil {
-		if err := binder.CookieBinder.Fetch(); err != nil {
+	if mb.MultipartFormBinder != nil {
+		if err := mb.MultipartFormBinder.Fetch(); err != nil {
 			return err
 		}
 	}
-	if binder.QueryBinder != nil {
-		if err := binder.QueryBinder.Fetch(); err != nil {
+	if mb.QueryBinder != nil {
+		if err := mb.QueryBinder.Fetch(); err != nil {
 			return err
 		}
 	}
-	if binder.JSONBinder != nil {
-		if err := binder.JSONBinder.Fetch(); err != nil {
+	if mb.UrlParamBinder != nil {
+		if err := mb.UrlParamBinder.Fetch(); err != nil {
 			return err
 		}
 	}
-	if binder.FormBinder != nil {
-		if err := binder.FormBinder.Fetch(); err != nil {
+	if mb.HeaderBinder != nil {
+		if err := mb.HeaderBinder.Fetch(); err != nil {
 			return err
 		}
 	}
-	if binder.MultipartFormBinder != nil {
-		if err := binder.MultipartFormBinder.Fetch(); err != nil {
+	if mb.CookieBinder != nil {
+		if err := mb.CookieBinder.Fetch(); err != nil {
 			return err
 		}
 	}

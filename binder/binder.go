@@ -1,11 +1,8 @@
+// binder.go
 package binder
 
 import (
 	"BinGo/enum"
-)
-
-const (
-	MaxMemoryDefault = 100 * 1024 * 1024 // 100MB
 )
 
 // TextUnmarshaler is a custom interface for types that can unmarshal themselves.
@@ -13,7 +10,7 @@ type TextUnmarshaler interface {
 	UnmarshalText(text []byte) error
 }
 
-type DataBinder interface {
+type Binder interface {
 	Fetch() error
 }
 

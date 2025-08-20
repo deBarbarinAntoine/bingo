@@ -1,9 +1,14 @@
+// multipart.go
 package binder
 
 import (
 	"net/http"
 	
 	"BinGo/enum"
+)
+
+const (
+	MaxMemoryDefault = 100 * 1024 * 1024 // 100MB
 )
 
 type MultipartForm struct {
@@ -44,8 +49,11 @@ func fetchMultipartFormData(bind *dataBind, src any) error {
 // NewMultipartForm uses functional options.
 //
 // Example usage:
-// 		q, err := NewMultipartForm(&myStruct, &request) // uses default
-// 		q, err := NewMultipartForm(&myStruct, &request, WithCustomFetcher(myCustomFetcher)) // uses custom
+// 		// with default fetcher with default 100MB max memory
+// 		q, err := NewMultipartForm(&myStruct, &request)
+//
+// 		// uses custom fetcher and 1GB max memory
+// 		q, err := NewMultipartForm(&myStruct, &request, WithCustomFetcher(myCustomFetcher), WithMaxMemory(1024*1024*1024))
 func NewMultipartForm(dst any, src *http.Request, opts ...BindOption) (*MultipartForm, error) {
 	
 	err := checkDst(dst)

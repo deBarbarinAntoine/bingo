@@ -1,3 +1,4 @@
+// errors.go
 package binder
 
 import (
