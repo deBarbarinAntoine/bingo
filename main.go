@@ -60,7 +60,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 //go:generate go run github.com/debarbarinantoine/go-enum-generate
 func main() {
-	srv := bingo.New("localhost:8008", "localhost:6379", "development").
+	srv := bingo.New(bingo.Options{
+		ServerAddr:  "localhost:8008",
+		RedisAddr:   "localhost:6379",
+		Environment: "development",
+	}).
 		WithLogMiddleware().
 		WithSessionMiddleware()
 	

@@ -22,6 +22,12 @@ type Bingo struct {
 	Logger         zerolog.Logger
 }
 
+type Options struct {
+	ServerAddr  string
+	RedisAddr   string
+	Environment string
+}
+
 func newPool(addr string) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle: 10,
@@ -31,27 +37,27 @@ func newPool(addr string) *redis.Pool {
 	}
 }
 
-func New(serverAddr, redisAddr, environment string) *Bingo {
+func New(options Options) *Bingo {
 	var output io.Writer = os.Stdout
-	if environment != "production" {
+	if options.Environment != "production" {
 		output = zerolog.ConsoleWriter{Out: os.Stdout}
 	}
 	// Initialize the zerolog logger
 	log := zerolog.New(output).With().
 		Timestamp().
-		Str("addr", serverAddr).
+		Str("addr", options.ServerAddr).
 		Logger()
 	
 	// Initialize a new session manager and configure it to use redisstore as the session store.
 	sessionManager := scs.New()
-	sessionManager.Store = redisstore.New(newPool(redisAddr))
+	sessionManager.Store = redisstore.New(newPool(options.RedisAddr))
 	mux := router.New()
 	return &Bingo{
 		SessionManager: sessionManager,
 		Logger:         log,
 		Mux:            mux,
 		Server: &http.Server{
-			Addr:              serverAddr,
+			Addr:              options.ServerAddr,
 			IdleTimeout:       time.Minute,
 			ReadHeaderTimeout: 3 * time.Second,
 			ReadTimeout:       5 * time.Second,
