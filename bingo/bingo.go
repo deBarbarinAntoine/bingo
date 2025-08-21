@@ -34,22 +34,11 @@ type Bingo struct {
 	Server         *http.Server
 	Logger         zerolog.Logger
 	JWT            *jwtauth.JWTAuth
-	RedisAddr      string
 }
 
 type Options struct {
 	ServerAddr  string
-	RedisAddr   string
 	Environment string
-}
-
-func newPool(addr string) *redis.Pool {
-	return &redis.Pool{
-		MaxIdle: 10,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", addr)
-		},
-	}
 }
 
 func New(options Options) *Bingo {
@@ -69,7 +58,6 @@ func New(options Options) *Bingo {
 	return &Bingo{
 		Logger:    log,
 		Mux:       mux,
-		RedisAddr: options.RedisAddr,
 		Server: &http.Server{
 			Addr:              options.ServerAddr,
 			IdleTimeout:       time.Minute,
