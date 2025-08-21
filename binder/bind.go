@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 	
-	"BinGo/enum"
+	"github.com/debarbarinantoine/bingo/enum"
 )
 
 const (

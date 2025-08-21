@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"time"
 	
-	"BinGo/bingo"
-	"BinGo/router"
+	"github.com/debarbarinantoine/bingo/bingo"
+	"github.com/debarbarinantoine/bingo/context"
+	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/rs/zerolog/hlog"
 )
@@ -37,7 +38,7 @@ type Data struct {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	data, ok := router.GetCtxData(r.Context(), "data").(*Data)
+	data, ok := context.GetCtxData(r.Context(), "data").(*Data)
 	if !ok {
 		http.Error(w, "no data", http.StatusInternalServerError)
 		return
@@ -58,16 +59,39 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
+func admin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "hello admin!",
+	})
+}
+
 //go:generate go run github.com/debarbarinantoine/go-enum-generate
 func main() {
 	srv := bingo.New(bingo.Options{
-		ServerAddr:  "localhost:8008",
-		RedisAddr:   "localhost:6379",
-		Environment: "development",
+		ServerAddr:   "localhost:8008",
+		Environment:  "development",
+		JWTSecret:    "|JwT53cr3T|",
+		JWTAlgorithm: "HS256",
 	}).
-		WithLogMiddleware().
-		WithSessionMiddleware()
+		WithLogMiddleware()
 	
+	srv.Mux.Use(
+		middleware.RealIP(),
+		middleware.CleanPath(),
+		middleware.RedirectSlashes(),
+		middleware.Timeout(time.Minute),
+		middleware.ThrottleBacklog(100, 500, time.Minute),
+		middleware.RateLimiterByIP(30, time.Minute),
+	)
+	
+	// public endpoint
 	srv.Mux.WithMultipartFormBindCtx("/:id", handler, &Data{}, "data", http.MethodPost)
+	
+	// restricted area
+	srv.Mux.Use(middleware.VerifyAndAuthenticateJWT())
+	srv.Mux.HandleFunc("/admin", admin, http.MethodGet)
+	
 	log.Fatal(srv.ListenAndServe())
 }

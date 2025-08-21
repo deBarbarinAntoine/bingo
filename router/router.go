@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"reflect"
 	
-	"BinGo/binder"
-	"BinGo/enum"
+	"github.com/debarbarinantoine/bingo/binder"
+	"github.com/debarbarinantoine/bingo/context"
+	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/alexedwards/flow"
 )
@@ -17,7 +19,7 @@ type Mux struct {
 
 func New() *Mux {
 	mux := flow.New()
-	mux.Use(userCtxData)
+	mux.Use(context.CtxData, middleware.Recoverer())
 	return &Mux{
 		Mux: mux,
 	}
@@ -40,7 +42,7 @@ func (m *Mux) withBindCtx(dst any, key string, binderOptions []binder.MultiBinde
 	dstType := reflect.TypeOf(dst)
 	
 	m.Group(func(mux *flow.Mux) {
-		mux.Use(BinderMiddleware(dstType, key, binderOptions...))
+		mux.Use(middleware.Binder(dstType, key, binderOptions...))
 		mux.HandleFunc(pattern, handler, methods...)
 	})
 }

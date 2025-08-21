@@ -4,7 +4,7 @@ package binder
 import (
 	"net/http"
 	
-	"BinGo/enum"
+	"github.com/debarbarinantoine/bingo/enum"
 )
 
 type Header struct {

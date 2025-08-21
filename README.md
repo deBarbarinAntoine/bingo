@@ -1,85 +1,148 @@
-# BinGo - Request Binder 🎯
+### BinGo - A Go Web Library ⚡
 
-A work-in-progress, highly flexible, and extensible request binder for Go, designed to handle and validate data from various HTTP request sources and bind it to a user-defined struct.
+BinGo is a highly flexible and extensible web library for Go, designed for rapid development of robust and scalable web services. It's built on idiomatic Go principles and provides a clear, modular architecture with sensible defaults.
 
-## 🚧 Work in Progress 🚧
+It uses widely adopted libraries like `zerolog` for logging, `alexedwards/flow` for routing, `alexedwards/scs` for sessions, `go-redis` for Redis integration, `justinas/nosurf` for CSRF and `go-chi` for middlewares, CORS, JWT and rate limiting.
 
-This project is currently under active development. The binder is functional and handles multiple data sources, but it is not yet complete. Use with caution.
+Contrary to other web libraries (and like `go-chi`), it's completely compatible with the `net/http` standard library.
 
-## 💡 Features
+-----
 
-* **Multi-Source Binding**: Binds data from different HTTP request sources (query strings, form data, JSON, URL parameters, headers, and cookies) to a single Go struct.
-* **Struct Tag-Based Configuration**: Uses simple struct tags (e.g., `query`, `multipart`, `json`, `param`, `header`, `cookie`) to map data fields.
-* **Automatic Type Conversion**: Automatically converts string values from the request into the appropriate Go types (integers, floats, booleans, time, etc.).
-* **Nested Struct Support**: Recursively binds data to nested structs and pointers to structs.
-* **File Uploads**: Handles single and multiple file uploads seamlessly.
-* **Extensible Design**: The core `dataBind` and `DataBinder` interface allow for easy creation of new binder types.
+### 🚧 Work in Progress 🚧
 
-## 📦 Installation
+This project is under active development. While the core features are functional, some parts are not yet complete, specifically the `Binder` implementation.
 
-To use the binder in your project, install it with `go get`:
+Use with caution.
+
+-----
+
+### 💡 Features
+
+* **Modular Architecture**: Built with a layered design, separating the server, router, and middleware for clean, maintainable code.
+* **Request Binding**:  Binds data from various HTTP request sources (JSON, URL parameters, form data, headers, and cookies) directly to a Go struct using simple tags.
+* **Automatic Type Conversion**: Automatically converts string values from requests to appropriate Go types (integers, floats, booleans, etc.).
+* **Secure by Default**: Integrates with battle-tested libraries for essential security features like CSRF protection.
+* **Extensive Middleware**: A curated collection of powerful middlewares for common web tasks:
+	* **Logging**: Structured logging via `zerolog`.
+	* **Authentication**: Supports both session-based authentication with a Redis store and stateless JWT-based authentication.
+	* **Rate Limiting**: Throttling and rate limiting to protect against abuse.
+	* **HTTP Helpers**: Clean URL paths, panic recovery, and timeout handling.
+* **Extensible Design**: The core components are designed to be easily extensible, allowing developers to add custom binders, middlewares, or authentication methods.
+
+-----
+
+### 📦 Installation
+
+To use BinGo in your project, install it with `go get`:
 
 ```sh
-go get github.com/deBarbarinAntoine/BinGo
+go get github.com/debarbarinantoine/bingo
 ```
 
-## 📚 Usage
+-----
 
-### 1\. Define Your Struct
+### 📚 Usage
 
-Define a struct and use the appropriate tags to specify where the data should be bound from.
+#### 1\. Initialize Your Server
 
-```go
-type User struct {
-    Name  string `param:"name"`
-    Age   int    `query:"age"`
-    Email string `json:"email"`
-}
-```
-
-### 2\. Bind the Request Data
-
-Choose the appropriate binder for your data source and call `Fetch()`.
+Create a new `Bingo` instance and configure it with your desired options, such as the server address, environment, and Redis store for sessions.
 
 ```go
 package main
 
 import (
-    "net/http"
     "log"
-    "BinGo/binder"
+    "time"
+
+    "github.com/debarbarinantoine/bingo/bingo"
+    "github.com/debarbarinantoine/bingo/middleware"
 )
 
-type MyData struct {
-    UserID    int    `param:"user_id"`
-    QueryParam string `query:"param"`
-}
+func main() {
+    srv := bingo.New(bingo.Options{
+        ServerAddr:   "localhost:8080",
+        Environment:  "development",
+        RedisAddr:    "localhost:6379",
+    }).
+    WithLogMiddleware().
+    WithSessions() // or WithJWT("HS256", "my_secret")
 
-func myHandler(w http.ResponseWriter, r *http.Request) {
-    // For URL parameters and query strings, you can use a single binder
-    data := &MyData{}
-    
-    // Create a new binder for your desired source
-    b, err := binder.NewUrlParam(data, r)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-    
-    // Fetch and bind the data
-    if err := b.Fetch(); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-    
-    log.Printf("User ID: %d, Query Param: %s", data.UserID, data.QueryParam)
+    srv.Mux.Use(
+        middleware.RealIP(),
+        middleware.Recoverer(),
+        middleware.Timeout(time.Minute),
+    )
+
+    // Define your routes and handlers
+    srv.Mux.HandleFunc("/", myHandler, "GET")
+
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
-## 🧑‍💻 Author
+#### 2\. Define a Struct for Binding
+
+Define a struct and use tags to map fields to data from the request. BinGo's `Binder` middleware can handle multiple sources at once.
+
+```go
+import (
+    "mime/multipart"
+    "time"
+)
+
+type MyRequestData struct {
+    UserID  int     `param:"user_id"`
+    Query   string  `query:"q"`
+    Email   string  `json:"email"`
+    File    *multipart.FileHeader `multipart:"file"`
+    AuthToken string `header:"Authorization"`
+    SessionID string `cookie:"session_id"`
+}
+```
+
+#### 3\. Handle the Request
+
+Use BinGo's `With...BindCtx` helpers to automatically bind the data to your struct and make it available in the handler's context.
+
+```go
+package main
+
+import (
+    "github.com/debarbarinantoine/bingo/bingo"
+    "net/http"
+    "log"
+)
+
+type User struct {
+    Name string `json:"name"`
+    Age  int    `param:"age"`
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    // Get the bound data from the context
+    user, _ := bingo.GetCtxData(r.Context(), "user").(*User)
+
+    log.Printf("User: %+v", user)
+}
+
+func main() {
+    srv := bingo.New(...)
+
+    // The middleware automatically binds the data from multiple sources
+    srv.Mux.WithJsonBindCtx("/users/:age", handler, &User{}, "user", "POST")
+
+    log.Fatal(srv.ListenAndServe())
+}
+```
+
+-----
+
+### 🧑‍💻 Author
 
 **Thorgan**
 
-## 📄 License
+-----
+
+### 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
