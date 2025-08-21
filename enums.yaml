@@ -14,3 +14,22 @@
       value: "form"
     - key: multipartForm
       value: "multipart"
+
+- name: sessionStore
+  values:
+    - key: InMemory
+      value: "memstore"
+    - key: Redis
+      value: "redisstore"
+    - key: GORM
+      value: "gormstore"
+    - key: MySQL
+      value: "mysqlstore"
+    - key: PostgreSQL
+      value: "postgresstore"
+    - key: MSSQL
+      value: "mssqlstore"
+    - key: SQLite3
+      value: "sqlite3store"
+    - key: MongoDB
+      value: "mongodbstore"

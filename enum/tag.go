@@ -10,7 +10,7 @@ import (
 // DO NOT MODIFY NOR EDIT THIS FILE DIRECTLY.
 // To modify this enum, edit the enums.json or enums.yaml definition file
 // To know more about `go-enum-generate`, see go to `https://github.com/debarbarinantoine/go-enum-generate`
-// Generated at: 2025-08-16 16:07:56
+// Generated at: 2025-08-21 20:58:55
 
 type Tag uint
 

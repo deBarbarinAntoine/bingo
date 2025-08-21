@@ -67,15 +67,14 @@ func admin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-//go:generate go run github.com/debarbarinantoine/go-enum-generate
+//go:generate go run github.com/debarbarinantoine/go-enum-generate@latest --force
 func main() {
 	srv := bingo.New(bingo.Options{
-		ServerAddr:   "localhost:8008",
-		Environment:  "development",
-		JWTSecret:    "|JwT53cr3T|",
-		JWTAlgorithm: "HS256",
+		ServerAddr:  "localhost:8008",
+		Environment: "development",
 	}).
-		WithLogMiddleware()
+		WithLogMiddleware().
+		WithJWT("HS256", "|JwT53cr3T|")
 	
 	srv.Mux.Use(
 		middleware.RealIP(),
