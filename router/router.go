@@ -3,7 +3,6 @@ package router
 
 import (
 	"net/http"
-	"reflect"
 	
 	"github.com/debarbarinantoine/bingo/binder"
 	"github.com/debarbarinantoine/bingo/context"
@@ -53,11 +52,8 @@ func (r *Router) WithBindCtx(pattern string, handler http.HandlerFunc, dst any, 
 }
 
 func (r *Router) withBindCtx(dst any, key string, binderOptions []binder.MultiBinderOption, pattern string, handler http.HandlerFunc, methods ...string) {
-	// Get the type of dst
-	dstType := reflect.TypeOf(dst)
-	
 	r.Group(func(router *Router) {
-		router.Use(middleware.Binder(dstType, key, binderOptions...))
+		router.Use(middleware.Binder(dst, key, binderOptions...))
 		router.HandleFunc(pattern, handler, methods...)
 	})
 }

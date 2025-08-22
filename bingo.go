@@ -1,5 +1,5 @@
 // bingo.go
-package BinGo
+package bingo
 
 import (
 	"database/sql"

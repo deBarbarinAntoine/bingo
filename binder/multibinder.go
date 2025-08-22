@@ -34,6 +34,14 @@ func WithBodyBinder(tag enum.Tag) []MultiBinderOption {
 	return binderOptions
 }
 
+func WithoutBodyBinder() MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.JSONBinder = nil
+		mb.FormBinder = nil
+		mb.MultipartFormBinder = nil
+	}
+}
+
 func WithCustomQueryBinder(customBinder *Query) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.QueryBinder = customBinder

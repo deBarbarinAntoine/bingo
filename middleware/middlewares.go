@@ -288,7 +288,11 @@ func Logger(logger zerolog.Logger) Middleware {
 // 	- url params
 // 	- headers
 // 	- cookies
-func Binder(dstType reflect.Type, key string, binderOptions ...binder.MultiBinderOption) Middleware {
+func Binder(dst any, key string, binderOptions ...binder.MultiBinderOption) Middleware {
+	
+	// Get the type of dst
+	dstType := reflect.TypeOf(dst)
+	
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			

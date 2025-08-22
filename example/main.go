@@ -70,7 +70,7 @@ func admin(w http.ResponseWriter, r *http.Request) {
 
 //go:generate go run github.com/debarbarinantoine/go-enum-generate@latest --force
 func main() {
-	srv, err := BinGo.New(BinGo.Options{
+	srv, err := bingo.New(bingo.Options{
 		ServerAddr:  "localhost:8008",
 		Environment: "development",
 	}).
