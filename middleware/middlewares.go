@@ -264,7 +264,11 @@ func Logger(logger zerolog.Logger) Middleware {
 	userAgentHandler := hlog.UserAgentHandler("user_agent")
 	refererHandler := hlog.RefererHandler("referer")
 	requestIDHandler := hlog.RequestIDHandler("req_id", "Request-Id")
+	endpointHandler := hlog.URLHandler("endpoint")
 	methodHandler := hlog.MethodHandler("method")
+	protoHandler := hlog.ProtoHandler("proto")
+	versionHandler := hlog.HTTPVersionHandler("version")
+	hostHandler := hlog.HostHandler("host")
 	
 	return func(next http.Handler) http.Handler {
 		return logHandler(
@@ -273,7 +277,15 @@ func Logger(logger zerolog.Logger) Middleware {
 					userAgentHandler(
 						refererHandler(
 							requestIDHandler(
-								methodHandler(next),
+								endpointHandler(
+									methodHandler(
+										protoHandler(
+											versionHandler(
+												hostHandler(next),
+											),
+										),
+									),
+								),
 							),
 						),
 					),
