@@ -1,5 +1,5 @@
 // errors.go
-package bingo
+package BinGo
 
 import "fmt"
 

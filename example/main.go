@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"time"
 	
-	"github.com/debarbarinantoine/bingo/bingo"
+	"github.com/debarbarinantoine/bingo"
 	"github.com/debarbarinantoine/bingo/context"
+	"github.com/debarbarinantoine/bingo/jwtkit"
 	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/rs/zerolog/hlog"
@@ -69,14 +70,17 @@ func admin(w http.ResponseWriter, r *http.Request) {
 
 //go:generate go run github.com/debarbarinantoine/go-enum-generate@latest --force
 func main() {
-	srv := bingo.New(bingo.Options{
+	srv, err := BinGo.New(BinGo.Options{
 		ServerAddr:  "localhost:8008",
 		Environment: "development",
 	}).
 		WithLogMiddleware().
-		WithJWT("HS256", "|JwT53cr3T|")
+		WithJWT(jwtkit.NewConfigWithSecret(jwtkit.AlgorithmHS256, "|JwT53cr3T|", jwtkit.DefaultTokenResponseOptions()))
+	if err != nil {
+		panic(err)
+	}
 	
-	srv.Mux.Use(
+	srv.Router.Use(
 		middleware.RealIP(),
 		middleware.CleanPath(),
 		middleware.RedirectSlashes(),
@@ -86,11 +90,11 @@ func main() {
 	)
 	
 	// public endpoint
-	srv.Mux.WithMultipartFormBindCtx("/:id", handler, &Data{}, "data", http.MethodPost)
+	srv.Router.WithMultipartFormBindCtx("/:id", handler, &Data{}, "data", http.MethodPost)
 	
 	// restricted area
-	srv.Mux.Use(middleware.VerifyAndAuthenticateJWT())
-	srv.Mux.HandleFunc("/admin", admin, http.MethodGet)
+	srv.Router.Use(jwtkit.VerifyAndAuthenticateJWT())
+	srv.Router.HandleFunc("/admin", admin, http.MethodGet)
 	
 	log.Fatal(srv.ListenAndServe())
 }

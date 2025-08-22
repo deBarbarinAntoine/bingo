@@ -1,5 +1,5 @@
 // bingo.go
-package bingo
+package BinGo
 
 import (
 	"database/sql"
@@ -9,8 +9,10 @@ import (
 	"time"
 	
 	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/jwtkit"
 	"github.com/debarbarinantoine/bingo/middleware"
 	"github.com/debarbarinantoine/bingo/router"
+	"github.com/debarbarinantoine/bingo/sessions"
 	
 	"github.com/alexedwards/scs/gormstore"
 	"github.com/alexedwards/scs/mongodbstore"
@@ -21,7 +23,6 @@ import (
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/alexedwards/scs/v2/memstore"
-	"github.com/go-chi/jwtauth/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/rs/zerolog"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,11 +30,11 @@ import (
 )
 
 type Bingo struct {
-	SessionManager *scs.SessionManager
-	Mux            *router.Mux
 	Server         *http.Server
+	Router         *router.Router
 	Logger         zerolog.Logger
-	JWT            *jwtauth.JWTAuth
+	SessionManager *scs.SessionManager
+	JwtConfig      *jwtkit.Config
 }
 
 type Options struct {
@@ -53,18 +54,18 @@ func New(options Options) *Bingo {
 		Logger()
 	
 	// Initialize a new router
-	mux := router.New()
+	r := router.New()
 	
 	return &Bingo{
-		Logger:    log,
-		Mux:       mux,
+		Logger: log,
+		Router: r,
 		Server: &http.Server{
 			Addr:              options.ServerAddr,
 			IdleTimeout:       time.Minute,
 			ReadHeaderTimeout: 3 * time.Second,
 			ReadTimeout:       5 * time.Second,
 			WriteTimeout:      10 * time.Second,
-			Handler:           mux,
+			Handler:           r,
 		},
 	}
 }
@@ -74,12 +75,12 @@ func (b *Bingo) ListenAndServe() error {
 }
 
 func (b *Bingo) UseLogMiddleware() {
-	b.Mux.Use(middleware.Logger(b.Logger))
+	b.Router.Use(middleware.Logger(b.Logger))
 }
 
 func (b *Bingo) UseSessionMiddleware() {
 	if b.SessionManager != nil {
-		b.Mux.Use(middleware.Session(b.SessionManager))
+		b.Router.Use(sessions.Session(b.SessionManager))
 	}
 }
 
@@ -88,20 +89,17 @@ func (b *Bingo) WithLogMiddleware() *Bingo {
 	return b
 }
 
-func (b *Bingo) WithJWT(jwtAlgorithm, jwtSecret string) *Bingo {
-	// Check if session manager or JWT auth are already initialized
-	if b.JWT != nil || b.SessionManager != nil {
-		return b
+func (b *Bingo) WithJWT(config *jwtkit.Config) (*Bingo, error) {
+	// Check if session manager or Config auth are already initialized
+	if b.JwtConfig != nil || b.SessionManager != nil {
+		return b, nil
 	}
 	
 	// Initialize a new JWTAuth instance with the specified secret and algorithm
-	var jwt *jwtauth.JWTAuth = nil
-	if jwtSecret != "" && jwtAlgorithm != "" {
-		jwt = jwtauth.New(jwtAlgorithm, []byte(jwtSecret), nil)
-		b.JWT = jwt
-		b.Mux.Use(middleware.SetJWT(jwt))
-	}
-	return b
+	b.JwtConfig = config
+	b.Router.Use(jwtkit.SetJWT(config))
+	
+	return b, nil
 }
 
 type SessionOptions struct {
@@ -148,8 +146,8 @@ func assignSessionOptions(opt SessionOptions, sessionManager *scs.SessionManager
 func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 	var err error
 	
-	// Check if session manager or JWT auth are already initialized
-	if b.SessionManager != nil || b.JWT != nil {
+	// Check if session manager or Config auth are already initialized
+	if b.SessionManager != nil || b.JwtConfig != nil {
 		return b, nil
 	}
 	
@@ -225,7 +223,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 	
 	// Set the session manager on the Bingo instance and apply the dependency injection middleware.
 	b.SessionManager = sessionManager
-	b.Mux.Use(middleware.SetSessionManager(sessionManager))
+	b.Router.Use(sessions.SetSessionManager(sessionManager))
 	
 	return b, nil
 }

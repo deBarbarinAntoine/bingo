@@ -1,11 +1,12 @@
 // session.go
-package middleware
+package sessions
 
 import (
 	"fmt"
 	"net/http"
 	
 	"github.com/debarbarinantoine/bingo/context"
+	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/alexedwards/scs/v2"
 	"github.com/rs/zerolog/hlog"
@@ -17,7 +18,7 @@ const (
 	AuthenticatedUserIDSessionManager = "authenticatedUserID"
 )
 
-func SetSessionManager(sessionManager *scs.SessionManager) Middleware {
+func SetSessionManager(sessionManager *scs.SessionManager) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r = context.SetCtxData(r, SessionManagerContext, sessionManager)
@@ -35,7 +36,7 @@ func GetSession(r *http.Request) (*scs.SessionManager, error) {
 	return sessionManager, nil
 }
 
-func Session(sessionManager *scs.SessionManager) Middleware {
+func Session(sessionManager *scs.SessionManager) middleware.Middleware {
 	return sessionManager.LoadAndSave
 }
 
@@ -55,7 +56,7 @@ func Login(r *http.Request, id int) error {
 	return nil
 }
 
-func Authenticate(userExists func(id int) (bool, error)) Middleware {
+func Authenticate(userExists func(id int) (bool, error)) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			
@@ -92,7 +93,7 @@ func Authenticate(userExists func(id int) (bool, error)) Middleware {
 	}
 }
 
-func RequireAuthentication(redirectionURL string) Middleware {
+func RequireAuthentication(redirectionURL string) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			
