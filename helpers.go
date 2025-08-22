@@ -10,34 +10,34 @@ import (
 
 type H map[string]any
 
-func Json(w http.ResponseWriter, data any, status int) error {
+func Json(r *http.Request, w http.ResponseWriter, data any, status int) {
 	
 	var byteBuffer bytes.Buffer
 	if err := json.NewEncoder(&byteBuffer).Encode(data); err != nil {
-		return ErrJsonResponseWith(err)
+		hlog.FromRequest(r).Error().Err(ErrJsonResponseWith(err)).Msg("Failed to encode JSON response")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	
 	if _, err := w.Write(byteBuffer.Bytes()); err != nil {
-		return ErrJsonResponseWith(err)
+		hlog.FromRequest(r).Error().Err(ErrJsonResponseWith(err)).Msg("Failed to write JSON response")
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
-	
-	return nil
 }
 
-func ServerError(r *http.Request, w http.ResponseWriter, err error, msg string) error {
+func ServerError(r *http.Request, w http.ResponseWriter, err error, msg string) {
 	hlog.FromRequest(r).Error().Err(err).Msg(msg)
-	return Json(w, H{
+	Json(r, w, H{
 		"error":  msg,
 		"status": http.StatusInternalServerError,
 	}, http.StatusInternalServerError)
 }
 
-func ClientError(r *http.Request, w http.ResponseWriter, status int, err error, msg string) error {
+func ClientError(r *http.Request, w http.ResponseWriter, status int, err error, msg string) {
 	hlog.FromRequest(r).Error().Err(err).Msg(msg)
-	return Json(w, H{
+	Json(r, w, H{
 		"error":  msg,
 		"status": status,
 	}, status)
