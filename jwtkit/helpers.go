@@ -121,7 +121,7 @@ func EncodeJWT(r *http.Request, claims map[string]any, opts ...EncodingOptions) 
 	
 	var key any
 	if jwtConfig.Algorithm.IsSymmetric() {
-		key = jwtConfig.secret
+		key = []byte(jwtConfig.secret)
 	} else if jwtConfig.Algorithm.IsAsymmetric() {
 		key = jwtConfig.privateKey
 	} else {
