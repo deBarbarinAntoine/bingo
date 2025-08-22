@@ -2,7 +2,7 @@
 package binder
 
 import (
-	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 )
 
 // TextUnmarshaler is a custom interface for types that can unmarshal themselves.

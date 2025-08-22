@@ -36,7 +36,7 @@ func ServerError(r *http.Request, w http.ResponseWriter, err error, msg string) 
 }
 
 func ClientError(r *http.Request, w http.ResponseWriter, status int, err error, msg string) {
-	hlog.FromRequest(r).Error().Err(err).Msg(msg)
+	hlog.FromRequest(r).Info().Err(err).Msg(msg)
 	Json(r, w, H{
 		"error":  msg,
 		"status": status,

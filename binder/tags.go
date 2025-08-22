@@ -4,7 +4,7 @@ package binder
 import (
 	"reflect"
 	
-	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 )
 
 func hasTags(dst any) map[enum.Tag]struct{} {

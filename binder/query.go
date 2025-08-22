@@ -4,7 +4,7 @@ package binder
 import (
 	"net/url"
 	
-	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 )
 
 type Query struct {

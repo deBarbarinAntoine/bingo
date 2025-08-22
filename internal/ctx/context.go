@@ -1,5 +1,5 @@
-// context.go
-package context
+// ctx.go
+package ctx
 
 import (
 	"context"
@@ -10,24 +10,24 @@ import (
 type contextKey struct{}
 type contextMap map[string]any
 
-func getCtxMap(ctx context.Context) contextMap {
+func getMap(ctx context.Context) contextMap {
 	ctxMap, ok := ctx.Value(contextKey{}).(contextMap)
 	if !ok {
 		// TODO -> Handle error better if necessary
-		panic(fmt.Errorf("contextMap not found in context"))
+		panic(fmt.Errorf("contextMap not found in ctx"))
 	}
 	return ctxMap
 }
 
-func SetCtxData(r *http.Request, key string, value any) *http.Request {
+func SetData(r *http.Request, key string, value any) *http.Request {
 	ctx := r.Context()
-	ctxMap := getCtxMap(ctx)
+	ctxMap := getMap(ctx)
 	ctxMap[key] = value
 	return r.WithContext(context.WithValue(ctx, contextKey{}, ctxMap))
 }
 
-func GetCtxData(ctx context.Context, key string) any {
-	ctxMap := getCtxMap(ctx)
+func GetData(ctx context.Context, key string) any {
+	ctxMap := getMap(ctx)
 	data, ok := ctxMap[key]
 	if !ok {
 		return nil
@@ -35,7 +35,7 @@ func GetCtxData(ctx context.Context, key string) any {
 	return data
 }
 
-func CtxData(next http.Handler) http.Handler {
+func Data(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ctxMap := make(contextMap)

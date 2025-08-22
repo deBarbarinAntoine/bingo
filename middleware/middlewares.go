@@ -7,7 +7,7 @@ import (
 	"time"
 	
 	"github.com/debarbarinantoine/bingo/binder"
-	"github.com/debarbarinantoine/bingo/context"
+	"github.com/debarbarinantoine/bingo/internal/ctx"
 	
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -18,6 +18,10 @@ import (
 )
 
 type Middleware func(next http.Handler) http.Handler
+
+func CtxData() Middleware {
+	return ctx.Data
+}
 
 // GenerateCSRF takes an HTTP request and returns
 // the Csrf token for that request
@@ -208,7 +212,7 @@ func ThrottleBacklog(limit int, backlogLimit int, backlogTimeout time.Duration) 
 // a 504 Gateway Timeout error to the client.
 //
 // It's required that you select the ctx.Done() channel to check for the signal
-// if the context has reached its deadline and return, otherwise the timeout
+// if the ctx has reached its deadline and return, otherwise the timeout
 // signal will be just ignored.
 //
 // ie. a route/handler may look like:
@@ -240,7 +244,7 @@ func RateLimiterByIP(requestLimit int, windowLength time.Duration) Middleware {
 	return httprate.LimitByIP(requestLimit, windowLength)
 }
 
-// Logger is a middleware that loads a logger into the request's context, along
+// Logger is a middleware that loads a logger into the request's ctx, along
 // with some useful data:
 // 	- RemoteAddr
 // 	- RemoteIP
@@ -306,7 +310,7 @@ func Binder(dst any, key string, binderOptions ...binder.MultiBinderOption) Midd
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			r = context.SetCtxData(r, key, newDst)
+			r = ctx.SetData(r, key, newDst)
 			next.ServeHTTP(w, r)
 		})
 	}

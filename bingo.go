@@ -8,10 +8,9 @@ import (
 	"os"
 	"time"
 	
-	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 	"github.com/debarbarinantoine/bingo/jwtkit"
 	"github.com/debarbarinantoine/bingo/middleware"
-	"github.com/debarbarinantoine/bingo/router"
 	"github.com/debarbarinantoine/bingo/sessions"
 	
 	"github.com/alexedwards/scs/gormstore"
@@ -31,7 +30,7 @@ import (
 
 type Bingo struct {
 	Server         *http.Server
-	Router         *router.Router
+	Router         *Router
 	Logger         zerolog.Logger
 	SessionManager *scs.SessionManager
 	JwtConfig      *jwtkit.Config
@@ -42,6 +41,144 @@ type Options struct {
 	Environment string
 }
 
+// New returns a new Bingo instance with the default middleware stack:
+// - middleware.CtxData()
+// - middleware.Recoverer()
+//
+// Usage example:
+//
+// 	package main
+//
+// import (
+//	"fmt"
+//	"mime/multipart"
+//	"net/http"
+//	"time"
+//
+//	"github.com/debarbarinantoine/bingo"
+//	"github.com/debarbarinantoine/bingo/jwtkit"
+//	"github.com/debarbarinantoine/bingo/middleware"
+//
+//	"github.com/rs/zerolog/hlog"
+// )
+//
+// // Publication represents a nested struct in the multipart data.
+// type Publication struct {
+//	Title string    `multipart:"title" json:"title"`
+//	Score float64   `multipart:"score" json:"score"`
+//	Date  time.Time `multipart:"date" json:"date"`
+// }
+//
+// // Info represents another nested struct, containing a slice of Publication.
+// type Info struct {
+//	Id           uint          `multipart:"id" json:"id"`
+//	Publications []Publication `multipart:"publications" json:"publications"`
+// }
+//
+// // Data shows how to bind various data types from different request sources.
+// // The `multipart` tag is used for form data.
+// // The `cookie`, `header`, `param`, and `query` tags are for other request sources.
+// type Data struct {
+//	Session   string                `cookie:"session" json:"session"`
+//	CSRFToken string                `header:"x-csrf-token" json:"x-csrf-token"`
+//	Id        uint                  `param:"id" json:"id"`
+//	Name      string                `query:"name" json:"name"`
+//	Age       int                   `multipart:"age" json:"age"`
+//	IsAdmin   bool                  `multipart:"is_admin" json:"is_admin"`
+//	Score     float64               `multipart:"score" json:"score"`
+//	Info      Info                  `multipart:"info" json:"info"`
+//	File      *multipart.FileHeader `multipart:"file" json:"file"`
+// }
+//
+// // handler processes the bound data and sends a JSON response.
+// func handler(w http.ResponseWriter, r *http.Request) {
+//	// Retrieve the bound data from the request context.
+//	data, ok := bingo.GetCtxData(r.Context(), "data").(*Data)
+//	if !ok {
+//		bingo.ServerError(r, w, fmt.Errorf("no data found in context"), "no data")
+//		return
+//	}
+//	hlog.FromRequest(r).Info().Msg("Request received successfully")
+//
+//	// Check if a file was uploaded and log its details.
+//	if data.File != nil {
+//		hlog.FromRequest(r).Info().
+//			Int64("file_size", data.File.Size).
+//			Str("file_name", data.File.Filename).
+//			Msg("File uploaded successfully")
+//	} else {
+//		hlog.FromRequest(r).Error().Msg("No file uploaded")
+//	}
+//
+//	// Respond to the client with the bound data in JSON format.
+//	bingo.Json(r, w, data, http.StatusOK)
+// }
+//
+// // ping is a handler for a common route without data.
+// func ping(w http.ResponseWriter, r *http.Request) {
+//	bingo.Json(r, w, bingo.H{"message": "pong"}, http.StatusOK)
+// }
+//
+// // admin is a handler for a restricted route.
+// func admin(w http.ResponseWriter, r *http.Request) {
+//	bingo.Json(r, w, bingo.H{"message": "hello admin!"}, http.StatusOK)
+// }
+//
+// func main() {
+//	// Initialize JWT configuration with a secret key.
+//	jwtConfig, err := jwtkit.NewConfigWithSecret(jwtkit.AlgorithmHS256, "|JwT53cr3T|", jwtkit.DefaultTokenResponseOptions())
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	// Initialize the server and chain builder methods to add middleware.
+//	// The "With..." methods use a builder pattern to configure the server.
+//	srv, err := bingo.New(bingo.Options{
+//		ServerAddr:  "localhost:8080",
+//		Environment: "development",
+//	}).
+//		WithLogMiddleware().
+//		WithJWT(jwtConfig)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	// Use global middlewares.
+//	srv.Router.Use(
+//		middleware.RealIP(),
+//		middleware.CleanPath(),
+//		middleware.RedirectSlashes(),
+//		middleware.Timeout(time.Minute),
+//		middleware.ThrottleBacklog(100, 500, time.Minute),
+//		middleware.RateLimiterByIP(30, time.Minute),
+//	)
+//
+//	// public endpoint with a URL parameter (id) that has a regex match, and data binding.
+//	srv.Router.WithMultipartFormBindCtx("/:id|\\d+", handler, &Data{}, "data", http.MethodPost)
+//
+//	// grouped routes that may have specific middlewares applied.
+//	srv.Router.Group(func(router *bingo.Router) {
+//
+//		// Add a middleware to the following routes onward
+//		// using the `router` instance specific to this group.
+//		router.Use(jwtkit.VerifyAndAuthenticateJWT())
+//
+//		// Restricted route, requires JWT authentication.
+//		router.HandleFunc("/admin", admin, http.MethodGet)
+//
+//		// Any following route will be restricted by the JWT middleware.
+//		// ...
+//	})
+//
+//	// public endpoint, not affected by the group set before.
+//	srv.Router.HandleFunc("/ping", ping, http.MethodGet)
+//
+//	// Start the server and listen for incoming requests.
+//	if err := srv.ListenAndServe(); err != nil {
+//		srv.Logger.Fatal().Err(err).Msg("Server error")
+//	}
+// }
+//
 func New(options Options) *Bingo {
 	var output io.Writer = os.Stdout
 	if options.Environment != "production" {
@@ -54,7 +191,7 @@ func New(options Options) *Bingo {
 		Logger()
 	
 	// Initialize a new router
-	r := router.New()
+	r := NewRouter()
 	
 	return &Bingo{
 		Logger: log,
@@ -70,25 +207,59 @@ func New(options Options) *Bingo {
 	}
 }
 
+// ListenAndServe starts the server and listens for incoming requests.
 func (b *Bingo) ListenAndServe() error {
 	return b.Server.ListenAndServe()
 }
 
+// UseLogMiddleware adds a middleware to load logger in the request context.
 func (b *Bingo) UseLogMiddleware() {
 	b.Router.Use(middleware.Logger(b.Logger))
 }
 
+// UseSessionMiddleware adds a middleware to load the *scs.SessionManager in the request context.
 func (b *Bingo) UseSessionMiddleware() {
 	if b.SessionManager != nil {
 		b.Router.Use(sessions.Session(b.SessionManager))
 	}
 }
 
+// WithLogMiddleware adds a middleware to load logger in the request context.
+//
+// It can be used in conjunction with the bingo.New()
+// function because it returns the same instance of Bingo.
+//
+// Example:
+//
+//	b := bingo.New().WithLogMiddleware()
 func (b *Bingo) WithLogMiddleware() *Bingo {
 	b.UseLogMiddleware()
 	return b
 }
 
+// WithJWT adds a middleware to load the *jwtkit.Config in the request context.
+//
+// It can be used in conjunction with the bingo.New()
+// function because it returns the same instance of Bingo.
+//
+// Example:
+//
+//	jwtConfig, err := jwtkit.NewConfigWithSecret(jwtkit.AlgorithmHS256, "|JwT53cr3T|", jwtkit.DefaultTokenResponseOptions())
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	// Initialize the server and chain builder methods to add middleware.
+//	// The "With..." methods use a builder pattern to configure the server.
+//	srv, err := bingo.New(bingo.Options{
+//		ServerAddr:  "localhost:8080",
+//		Environment: "development",
+//	}).
+//		WithLogMiddleware().
+//		WithJWT(jwtConfig)
+//	if err != nil {
+//		panic(err)
+//	}
 func (b *Bingo) WithJWT(config *jwtkit.Config) (*Bingo, error) {
 	// Check if session manager or Config auth are already initialized
 	if b.JwtConfig != nil || b.SessionManager != nil {
@@ -102,6 +273,7 @@ func (b *Bingo) WithJWT(config *jwtkit.Config) (*Bingo, error) {
 	return b, nil
 }
 
+// SessionOptions represents the options for configuring session management.
 type SessionOptions struct {
 	DBPool      any
 	IdleTimeout time.Duration
@@ -110,6 +282,7 @@ type SessionOptions struct {
 	Cookie      scs.SessionCookie
 }
 
+// NewSessionOptions creates a new SessionOptions instance with default values.
 func NewSessionOptions() SessionOptions {
 	return SessionOptions{
 		Lifetime: 24 * time.Hour,
@@ -143,6 +316,23 @@ func assignSessionOptions(opt SessionOptions, sessionManager *scs.SessionManager
 	sessionManager.Cookie.Persist = opt.Cookie.Persist
 }
 
+// WithSessions adds a middleware to load the *scs.SessionManager in the request context.
+//
+// It can be used in conjunction with the bingo.New()
+// function because it returns the same instance of Bingo.
+//
+// Example:
+//
+//	srv, err := bingo.New(bingo.Options{
+//		ServerAddr:  "localhost:8080",
+//		Environment: "development",
+//	}).
+//		WithLogMiddleware().
+//		WithSessions(NewSessionOptions())
+//	if err != nil {
+//		panic(err)
+//	}
+//
 func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 	var err error
 	

@@ -5,8 +5,7 @@ import (
 	"net/http"
 	
 	"github.com/debarbarinantoine/bingo/binder"
-	"github.com/debarbarinantoine/bingo/context"
-	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/alexedwards/flow"
@@ -16,9 +15,14 @@ type Router struct {
 	*flow.Mux
 }
 
+// New returns a new Router instance with the default middleware stack:
+//
+// Middleware:
+// - middleware.CtxData()
+// - middleware.Recoverer()
 func New() *Router {
 	mux := flow.New()
-	mux.Use(context.CtxData, middleware.Recoverer())
+	mux.Use(middleware.CtxData(), middleware.Recoverer())
 	return &Router{
 		Mux: mux,
 	}
@@ -31,8 +35,14 @@ func New() *Router {
 //
 // N.B.: it comes from alexedwards/flow library
 func (r *Router) Group(fn func(*Router)) {
-	mm := *r
-	fn(&mm)
+	// We call the original flow.Mux.Group method.
+	// The key is the function we pass to it.
+	r.Mux.Group(func(m *flow.Mux) {
+		// Here, we take the *flow.Mux (m) provided by the original library,
+		// wrap it in a new *Router, and then pass that to the user's function.
+		// This is the crucial adapter/bridge step.
+		fn(&Router{Mux: m})
+	})
 }
 
 func (r *Router) WithFormBindCtx(pattern string, handler http.HandlerFunc, dst any, key string, methods ...string) {

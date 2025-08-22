@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	
-	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 )
 
 type JSON struct {

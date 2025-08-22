@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	
-	"github.com/debarbarinantoine/bingo/context"
+	"github.com/debarbarinantoine/bingo/internal/ctx"
 	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/alexedwards/scs/v2"
@@ -21,17 +21,17 @@ const (
 func SetSessionManager(sessionManager *scs.SessionManager) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r = context.SetCtxData(r, SessionManagerContext, sessionManager)
+			r = ctx.SetData(r, SessionManagerContext, sessionManager)
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
 func GetSession(r *http.Request) (*scs.SessionManager, error) {
-	sessionManager, ok := context.GetCtxData(r.Context(), SessionManagerContext).(*scs.SessionManager)
+	sessionManager, ok := ctx.GetData(r.Context(), SessionManagerContext).(*scs.SessionManager)
 	if !ok {
-		hlog.FromRequest(r).Error().Msg("Session Manager not found in context")
-		return nil, fmt.Errorf("session Manager not found in context")
+		hlog.FromRequest(r).Error().Msg("Session Manager not found in ctx")
+		return nil, fmt.Errorf("session Manager not found in ctx")
 	}
 	return sessionManager, nil
 }
@@ -49,7 +49,7 @@ func Login(r *http.Request, id int) error {
 	
 	sessionManager, err := GetSession(r)
 	if err != nil {
-		hlog.FromRequest(r).Error().Err(err).Msg("Session Manager not found in context")
+		hlog.FromRequest(r).Error().Err(err).Msg("Session Manager not found in ctx")
 		return err
 	}
 	sessionManager.Put(r.Context(), AuthenticatedUserIDSessionManager, id)
@@ -62,7 +62,7 @@ func Authenticate(userExists func(id int) (bool, error)) middleware.Middleware {
 			
 			sessionManager, err := GetSession(r)
 			if err != nil {
-				hlog.FromRequest(r).Error().Err(err).Msg("Session Manager not found in context")
+				hlog.FromRequest(r).Error().Err(err).Msg("Session Manager not found in ctx")
 				http.Error(w, "Session Manager not found", http.StatusInternalServerError)
 				return
 			}
@@ -84,8 +84,8 @@ func Authenticate(userExists func(id int) (bool, error)) middleware.Middleware {
 			}
 			
 			if exists {
-				// setting the user as authenticated in the context
-				r = context.SetCtxData(r, IsAuthenticatedContext, true)
+				// setting the user as authenticated in the ctx
+				r = ctx.SetData(r, IsAuthenticatedContext, true)
 			}
 			
 			next.ServeHTTP(w, r)
@@ -97,7 +97,7 @@ func RequireAuthentication(redirectionURL string) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			
-			isAuthenticated, ok := context.GetCtxData(r.Context(), IsAuthenticatedContext).(bool)
+			isAuthenticated, ok := ctx.GetData(r.Context(), IsAuthenticatedContext).(bool)
 			if !ok || !isAuthenticated {
 				http.Redirect(w, r, redirectionURL, http.StatusSeeOther)
 				return

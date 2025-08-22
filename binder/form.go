@@ -4,7 +4,7 @@ package binder
 import (
 	"net/http"
 	
-	"github.com/debarbarinantoine/bingo/enum"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 )
 
 type Form struct {
