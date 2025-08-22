@@ -1,4 +1,3 @@
-// tags.go
 package binder
 
 import (

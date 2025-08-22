@@ -1,4 +1,3 @@
-// multipart.go
 package binder
 
 import (

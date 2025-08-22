@@ -1,4 +1,3 @@
-// middlewares.go
 package middleware
 
 import (
@@ -13,8 +12,6 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httprate"
 	"github.com/justinas/nosurf"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/hlog"
 )
 
 type Middleware func(next http.Handler) http.Handler
@@ -242,57 +239,6 @@ func Timeout(timeout time.Duration) Middleware {
 // N.B.: it comes from go-chi/chi/v5/middleware library
 func RateLimiterByIP(requestLimit int, windowLength time.Duration) Middleware {
 	return httprate.LimitByIP(requestLimit, windowLength)
-}
-
-// Logger is a middleware that loads a logger into the request's ctx, along
-// with some useful data:
-// 	- RemoteAddr
-// 	- RemoteIP
-// 	- UserAgent
-// 	- Referer
-// 	- RequestID
-// 	- Method
-//
-// When standard output is a TTY, Logger will
-// print in color, otherwise it will print in black and white.
-//
-// N.B.: it uses rs/zerolog logger
-func Logger(logger zerolog.Logger) Middleware {
-	logHandler := hlog.NewHandler(logger)
-	remoteAddrHandler := hlog.RemoteAddrHandler("addr")
-	remoteIPHandler := hlog.RemoteIPHandler("remote_ip")
-	userAgentHandler := hlog.UserAgentHandler("user_agent")
-	refererHandler := hlog.RefererHandler("referer")
-	requestIDHandler := hlog.RequestIDHandler("req_id", "Request-Id")
-	endpointHandler := hlog.URLHandler("endpoint")
-	methodHandler := hlog.MethodHandler("method")
-	protoHandler := hlog.ProtoHandler("proto")
-	versionHandler := hlog.HTTPVersionHandler("version")
-	hostHandler := hlog.HostHandler("host")
-	
-	return func(next http.Handler) http.Handler {
-		return logHandler(
-			remoteAddrHandler(
-				remoteIPHandler(
-					userAgentHandler(
-						refererHandler(
-							requestIDHandler(
-								endpointHandler(
-									methodHandler(
-										protoHandler(
-											versionHandler(
-												hostHandler(next),
-											),
-										),
-									),
-								),
-							),
-						),
-					),
-				),
-			),
-		)
-	}
 }
 
 // Binder is a middleware that binds the request body to a struct using the

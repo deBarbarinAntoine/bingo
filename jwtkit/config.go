@@ -1,4 +1,3 @@
-// config.go
 package jwtkit
 
 import (
@@ -61,22 +60,33 @@ type Config struct {
 }
 
 // WithIssuer sets the issuer of the JWT token
-func (c *Config) WithIssuer(issuer string) {
-	if issuer != "" {
-		c.Issuer = issuer
+func (c *Config) WithIssuer(issuer string) *Config {
+	if issuer == "" || issuer == c.Issuer {
+		return c
 	}
+	newCfg := *c
+	newCfg.Issuer = issuer
+	return &newCfg
 }
 
 // WithAudience sets the audience of the JWT token
-func (c *Config) WithAudience(audience []string) {
-	if audience != nil {
-		c.Audience = audience
+func (c *Config) WithAudience(audience []string) *Config {
+	if audience == nil {
+		return c
 	}
+	newCfg := *c
+	newCfg.Audience = audience
+	return &newCfg
 }
 
 // WithTTL sets the time to live of the JWT token
-func (c *Config) WithTTL(ttl time.Duration) {
-	c.TTL = ttl
+func (c *Config) WithTTL(ttl time.Duration) *Config {
+	if ttl == c.TTL {
+		return c
+	}
+	newCfg := *c
+	newCfg.TTL = ttl
+	return &newCfg
 }
 
 // NewConfigWithSecret creates a new JWT config with a secret

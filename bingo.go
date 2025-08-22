@@ -1,4 +1,3 @@
-// bingo.go
 package bingo
 
 import (
@@ -28,6 +27,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// Bingo represents the Bingo server.
 type Bingo struct {
 	Server         *http.Server
 	Router         *Router
@@ -36,9 +36,27 @@ type Bingo struct {
 	JwtConfig      *jwtkit.Config
 }
 
+// Options represents the configuration options for the Bingo server.
 type Options struct {
-	ServerAddr  string
+	
+	// ServerAddr specifies the address to listen on for the server.
+	//
+	// For example: ":8080".
+	ServerAddr string
+	
+	// Environment specifies the environment in which the server is running.
+	// It can be "development", "production", or "test".
+	//
+	// Only "production" sets the logger to output JSON format.
 	Environment string
+	
+	// UseRealIP specifies whether to use the RealIP middleware.
+	//
+	// If set to true, the RealIP middleware will be added to the middleware stack
+	// to extract the real client IP from headers like X-Forwarded-For and X-Real-IP.
+	//
+	// Enable this when your server is behind proxies, load balancers, or CDNs.
+	UseRealIP bool
 }
 
 // New returns a new Bingo instance with the default middleware stack:
@@ -193,6 +211,11 @@ func New(options Options) *Bingo {
 	// Initialize a new router
 	r := NewRouter()
 	
+	// Apply the RealIP middleware if UseRealIP is true
+	if options.UseRealIP {
+		r.Use(middleware.RealIP())
+	}
+	
 	return &Bingo{
 		Logger: log,
 		Router: r,
@@ -278,15 +301,18 @@ type SessionOptions struct {
 	DBPool      any
 	IdleTimeout time.Duration
 	Lifetime    time.Duration
-	Store       enum.SessionStore
-	Cookie      scs.SessionCookie
+	
+	// Store specifies the session store to use.
+	// Use sessions.Stores struct to specify the session store to use.
+	Store  enum.SessionStore
+	Cookie scs.SessionCookie
 }
 
 // NewSessionOptions creates a new SessionOptions instance with default values.
 func NewSessionOptions() SessionOptions {
 	return SessionOptions{
 		Lifetime: 24 * time.Hour,
-		Store:    enum.SessionStores.InMemory,
+		Store:    sessions.Stores.InMemory,
 		Cookie: scs.SessionCookie{
 			Name:        "session",
 			HttpOnly:    true,
@@ -347,7 +373,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 	
 	switch opt.Store {
 	
-	case enum.SessionStores.GORM:
+	case sessions.Stores.GORM:
 		gormConn, ok := opt.DBPool.(*gorm.DB)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
@@ -358,7 +384,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 			return nil, err
 		}
 	
-	case enum.SessionStores.Redis:
+	case sessions.Stores.Redis:
 		redisConn, ok := opt.DBPool.(*redis.Pool)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
@@ -366,7 +392,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 		}
 		sessionManager.Store = redisstore.New(redisConn)
 	
-	case enum.SessionStores.PostgreSQL:
+	case sessions.Stores.PostgreSQL:
 		postgresConn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
@@ -374,7 +400,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 		}
 		sessionManager.Store = postgresstore.New(postgresConn)
 	
-	case enum.SessionStores.MySQL:
+	case sessions.Stores.MySQL:
 		mysqlConn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
@@ -382,7 +408,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 		}
 		sessionManager.Store = mysqlstore.New(mysqlConn)
 	
-	case enum.SessionStores.SQLite3:
+	case sessions.Stores.SQLite3:
 		sqlite3Conn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
@@ -390,7 +416,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 		}
 		sessionManager.Store = sqlite3store.New(sqlite3Conn)
 	
-	case enum.SessionStores.MongoDB:
+	case sessions.Stores.MongoDB:
 		mongoConn, ok := opt.DBPool.(*mongo.Database)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
@@ -398,7 +424,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 		}
 		sessionManager.Store = mongodbstore.New(mongoConn)
 	
-	case enum.SessionStores.MSSQL:
+	case sessions.Stores.MSSQL:
 		mssqlConn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")

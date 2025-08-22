@@ -1,4 +1,3 @@
-// helpers.go
 package jwtkit
 
 import (
@@ -8,6 +7,7 @@ import (
 	
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/rs/zerolog/hlog"
 )
 
 type encodingOption struct {
@@ -121,8 +121,14 @@ func EncodeJWT(r *http.Request, claims map[string]any, opts ...EncodingOptions) 
 	
 	var key any
 	if jwtConfig.Algorithm.IsSymmetric() {
+		if jwtConfig.secret == "" {
+			return nil, "", fmt.Errorf("secret is required for symmetric algorithm")
+		}
 		key = []byte(jwtConfig.secret)
 	} else if jwtConfig.Algorithm.IsAsymmetric() {
+		if jwtConfig.privateKey == nil {
+			return nil, "", fmt.Errorf("private key is required for asymmetric algorithm")
+		}
 		key = jwtConfig.privateKey
 	} else {
 		key = nil
@@ -130,8 +136,8 @@ func EncodeJWT(r *http.Request, claims map[string]any, opts ...EncodingOptions) 
 	
 	tokenStr, err := jwt.Sign(token, jwt.WithKey(jwtConfig.Algorithm.toJwaAlgo(), key))
 	if err != nil {
-		fmt.Printf("failed to sign token: %s\n", err)
-		return nil, "", err
+		hlog.FromRequest(r).Error().Err(err).Msg("failed to sign token")
+		return nil, "", fmt.Errorf("failed to sign token: %w", err)
 	}
 	
 	return token, string(tokenStr), nil
@@ -178,15 +184,21 @@ func setTokenInResponse(w http.ResponseWriter, token jwt.Token, tokenString stri
 	
 	// Set cookie
 	if opts.SetInCookie {
+		exp, hasExp := token.Expiration()
 		cookie := &http.Cookie{
 			Name:     opts.CookieName,
 			Value:    tokenString,
-			Expires:  exp,
 			Secure:   opts.CookieSecure,
 			HttpOnly: opts.CookieHttpOnly,
 			SameSite: opts.CookieSameSite,
 			Path:     "/",
 		}
+		
+		// Only set expiration if the token has one
+		if hasExp {
+			cookie.Expires = exp
+		}
+		
 		http.SetCookie(w, cookie)
 	}
 	return nil

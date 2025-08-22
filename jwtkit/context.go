@@ -1,4 +1,3 @@
-// ctx.go
 package jwtkit
 
 import (

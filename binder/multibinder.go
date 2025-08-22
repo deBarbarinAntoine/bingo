@@ -1,4 +1,3 @@
-// multibinder.go
 package binder
 
 import (

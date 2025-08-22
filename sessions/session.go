@@ -1,4 +1,3 @@
-// session.go
 package sessions
 
 import (
@@ -6,6 +5,7 @@ import (
 	"net/http"
 	
 	"github.com/debarbarinantoine/bingo/internal/ctx"
+	"github.com/debarbarinantoine/bingo/internal/enum"
 	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/alexedwards/scs/v2"
@@ -16,6 +16,10 @@ const (
 	SessionManagerContext             = "sessionManager"
 	IsAuthenticatedContext            = "isAuthenticated"
 	AuthenticatedUserIDSessionManager = "authenticatedUserID"
+)
+
+var (
+	Stores = enum.SessionStores
 )
 
 func SetSessionManager(sessionManager *scs.SessionManager) middleware.Middleware {

@@ -1,4 +1,3 @@
-// algorithm.go
 package jwtkit
 
 import (

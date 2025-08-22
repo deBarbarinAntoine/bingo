@@ -1,4 +1,3 @@
-// json.go
 package binder
 
 import (

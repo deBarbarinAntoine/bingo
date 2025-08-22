@@ -1,4 +1,3 @@
-// middleware.go
 package jwtkit
 
 import (

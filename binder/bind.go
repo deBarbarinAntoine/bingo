@@ -1,4 +1,3 @@
-// bind.go
 package binder
 
 import (

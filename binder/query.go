@@ -1,4 +1,3 @@
-// query.go
 package binder
 
 import (

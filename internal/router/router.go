@@ -1,4 +1,3 @@
-// router.go
 package router
 
 import (

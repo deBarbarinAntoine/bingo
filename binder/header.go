@@ -1,4 +1,3 @@
-// header.go
 package binder
 
 import (

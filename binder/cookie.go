@@ -1,4 +1,3 @@
-// cookie.go
 package binder
 
 import (
