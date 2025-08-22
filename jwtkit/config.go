@@ -7,8 +7,17 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"net/http"
+	"time"
 	
 	"github.com/go-chi/jwtauth/v5"
+)
+
+const (
+	defaultIssuer = "bingo.auth.service"
+)
+
+var (
+	defaultAudience = []string{"bingo.auth.client"}
 )
 
 // TokenResponseOptions configures how tokens are returned in responses
@@ -41,17 +50,38 @@ func DefaultTokenResponseOptions() *TokenResponseOptions {
 
 // Config is the configuration for the JWT auth middleware
 type Config struct {
-	Algorithm Algorithm
-	JWTAuth   *jwtauth.JWTAuth
-	Options   *TokenResponseOptions
+	TTL        time.Duration
+	Issuer     string
+	Audience   []string
+	Algorithm  Algorithm
+	JWTAuth    *jwtauth.JWTAuth
+	Options    *TokenResponseOptions
+	secret     string
+	privateKey any
+}
+
+// WithIssuer sets the issuer of the JWT token
+func (c *Config) WithIssuer(issuer string) {
+	if issuer != "" {
+		c.Issuer = issuer
+	}
+}
+
+// WithAudience sets the audience of the JWT token
+func (c *Config) WithAudience(audience []string) {
+	if audience != nil {
+		c.Audience = audience
+	}
+}
+
+// WithTTL sets the time to live of the JWT token
+func (c *Config) WithTTL(ttl time.Duration) {
+	c.TTL = ttl
 }
 
 // NewConfigWithSecret creates a new JWT config with a secret
 func NewConfigWithSecret(algorithm Algorithm, secret string, options *TokenResponseOptions) (*Config, error) {
-	cfg := &Config{
-		Algorithm: algorithm,
-		Options:   options,
-	}
+	cfg := newConfig(algorithm, secret, nil, options)
 	var err error
 	cfg.JWTAuth, err = newAuthWithSecret(algorithm, secret)
 	if err != nil {
@@ -62,10 +92,7 @@ func NewConfigWithSecret(algorithm Algorithm, secret string, options *TokenRespo
 
 // NewConfigWithRSA creates a new JWT config with a RSA private key
 func NewConfigWithRSA(algorithm Algorithm, privateKey *rsa.PrivateKey, options *TokenResponseOptions) (*Config, error) {
-	cfg := &Config{
-		Algorithm: algorithm,
-		Options:   options,
-	}
+	cfg := newConfig(algorithm, "", privateKey, options)
 	var err error
 	cfg.JWTAuth, err = newAuthWithRSA(algorithm, privateKey)
 	if err != nil {
@@ -76,10 +103,7 @@ func NewConfigWithRSA(algorithm Algorithm, privateKey *rsa.PrivateKey, options *
 
 // NewConfigWithECDSA creates a new JWT config with a ECDSA private key
 func NewConfigWithECDSA(algorithm Algorithm, privateKey *ecdsa.PrivateKey, options *TokenResponseOptions) (*Config, error) {
-	cfg := &Config{
-		Algorithm: algorithm,
-		Options:   options,
-	}
+	cfg := newConfig(algorithm, "", privateKey, options)
 	var err error
 	cfg.JWTAuth, err = newAuthWithECDSA(algorithm, privateKey)
 	if err != nil {
@@ -90,10 +114,7 @@ func NewConfigWithECDSA(algorithm Algorithm, privateKey *ecdsa.PrivateKey, optio
 
 // NewConfigWithEdDSA creates a new JWT config with a EdDSA private key
 func NewConfigWithEdDSA(algorithm Algorithm, privateKey ed25519.PrivateKey, options *TokenResponseOptions) (*Config, error) {
-	cfg := &Config{
-		Algorithm: algorithm,
-		Options:   options,
-	}
+	cfg := newConfig(algorithm, "", privateKey, options)
 	var err error
 	cfg.JWTAuth, err = newAuthWithEdDSA(algorithm, privateKey)
 	if err != nil {
@@ -107,10 +128,20 @@ func NewConfigWithEdDSA(algorithm Algorithm, privateKey ed25519.PrivateKey, opti
 //
 // This is NOT SAFE, do NOT use this in production!
 func NewConfigUnsigned(options *TokenResponseOptions) *Config {
+	cfg := newConfig(AlgorithmNone, "", nil, options)
+	cfg.JWTAuth = newAuthUnsigned()
+	return cfg
+}
+
+func newConfig(algorithm Algorithm, secret string, privateKey any, options *TokenResponseOptions) *Config {
 	return &Config{
-		Algorithm: AlgorithmNone,
-		Options:   options,
-		JWTAuth:   newAuthUnsigned(),
+		TTL:        time.Hour * 24,
+		Issuer:     defaultIssuer,
+		Audience:   defaultAudience,
+		Algorithm:  algorithm,
+		Options:    options,
+		secret:     secret,
+		privateKey: privateKey,
 	}
 }
 

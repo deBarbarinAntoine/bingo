@@ -1,7 +1,11 @@
 // algorithm.go
 package jwtkit
 
-import "slices"
+import (
+	"slices"
+	
+	"github.com/lestrrat-go/jwx/v3/jwa"
+)
 
 type Algorithm string
 
@@ -117,4 +121,39 @@ func (algorithm Algorithm) IsEdDSA() bool {
 // IsAsymmetric returns true if the algorithm is asymmetric
 func (algorithm Algorithm) IsAsymmetric() bool {
 	return slices.Contains(asymmetricAlgorithms, algorithm)
+}
+
+func (algorithm Algorithm) toJwaAlgo() jwa.KeyAlgorithm {
+	switch algorithm {
+	case AlgorithmHS256:
+		return jwa.HS256()
+	case AlgorithmHS384:
+		return jwa.HS384()
+	case AlgorithmHS512:
+		return jwa.HS512()
+	case AlgorithmRS256:
+		return jwa.RS256()
+	case AlgorithmRS384:
+		return jwa.RS384()
+	case AlgorithmRS512:
+		return jwa.RS512()
+	case AlgorithmES256:
+		return jwa.ES256()
+	case AlgorithmES256K:
+		return jwa.ES256K()
+	case AlgorithmES384:
+		return jwa.ES384()
+	case AlgorithmES512:
+		return jwa.ES512()
+	case AlgorithmEdDSA:
+		return jwa.EdDSA()
+	case AlgorithmPS256:
+		return jwa.PS256()
+	case AlgorithmPS384:
+		return jwa.PS384()
+	case AlgorithmPS512:
+		return jwa.PS512()
+	default:
+		return jwa.NoSignature()
+	}
 }
