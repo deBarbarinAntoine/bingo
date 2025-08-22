@@ -2,7 +2,7 @@
 
 BinGo is a highly flexible and extensible web library for Go, designed for rapid development of robust and scalable web services. It's built on idiomatic Go principles and provides a clear, modular architecture with sensible defaults.
 
-It uses widely adopted libraries like `zerolog` for logging, `alexedwards/flow` for routing, `alexedwards/scs` for sessions, `go-redis` for Redis integration, `justinas/nosurf` for CSRF and `go-chi` for middlewares, CORS, JWT and rate limiting.
+It uses widely adopted libraries like `zerolog` for logging, `alexedwards/flow` for routing, `alexedwards/scs` for sessions and session stores, `justinas/nosurf` for CSRF and `go-chi` for middlewares, CORS, JWT and rate limiting.
 
 Contrary to other web libraries (and like `go-chi`), it's completely compatible with the `net/http` standard library.
 
@@ -24,7 +24,7 @@ Use with caution.
 * **Secure by Default**: Integrates with battle-tested libraries for essential security features like CSRF protection.
 * **Extensive Middleware**: A curated collection of powerful middlewares for common web tasks:
 	* **Logging**: Structured logging via `zerolog`.
-	* **Authentication**: Supports both session-based authentication with a Redis store and stateless JWT-based authentication.
+	* **Authentication**: Supports both session-based authentication with multiple stores (PostgreSQL, MySQL, MSSQL, SQLite3, GORM, Redis, etc.) and stateless JWT-based authentication (with secret or RSA/ECDSA/EdDSA encryption).
 	* **Rate Limiting**: Throttling and rate limiting to protect against abuse.
 	* **HTTP Helpers**: Clean URL paths, panic recovery, and timeout handling.
 * **Extensible Design**: The core components are designed to be easily extensible, allowing developers to add custom binders, middlewares, or authentication methods.
@@ -64,17 +64,16 @@ func main() {
         Environment:  "development",
         RedisAddr:    "localhost:6379",
     }).
-    WithLogMiddleware().
-    WithSessions() // or WithJWT("HS256", "my_secret")
+    WithLogMiddleware()
 
-    srv.Mux.Use(
+    srv.Router.Use(
         middleware.RealIP(),
         middleware.Recoverer(),
         middleware.Timeout(time.Minute),
     )
 
     // Define your routes and handlers
-    srv.Mux.HandleFunc("/", myHandler, "GET")
+    srv.Router.HandleFunc("/", myHandler, "GET")
 
     log.Fatal(srv.ListenAndServe())
 }
