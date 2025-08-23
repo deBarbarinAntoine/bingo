@@ -3,9 +3,6 @@ package helpers
 import "fmt"
 
 var (
-	ErrJsonResponse = fmt.Errorf("json response error")
+	ErrJsonEncode = fmt.Errorf("failed to encode JSON response")
+	ErrJsonWrite  = fmt.Errorf("failed to write JSON response")
 )
-
-func ErrJsonResponseWith(err error) error {
-	return fmt.Errorf("%w: %w", ErrJsonResponse, err)
-}
