@@ -64,6 +64,18 @@ func WithTTL(ttl time.Duration) EncodingOptions {
 	}
 }
 
+// Login logs in a user by encoding a JWT token with the provided claims and options.
+//
+// It is a convenience function that calls EncodeJWT and SetTokenInResponse.
+func Login(r *http.Request, w http.ResponseWriter, claims map[string]any, opts ...EncodingOptions) error {
+	token, tokenString, err := EncodeJWT(r, claims, opts...)
+	if err != nil {
+		return err
+	}
+	
+	return SetTokenInResponse(r, w, token, tokenString)
+}
+
 // EncodeJWT encodes a JWT token with the provided claims and options.
 func EncodeJWT(r *http.Request, claims map[string]any, opts ...EncodingOptions) (jwt.Token, string, error) {
 	jwtConfig, err := GetJWT(r)
