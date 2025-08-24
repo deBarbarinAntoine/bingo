@@ -12,6 +12,13 @@ import (
 // Router is a wrapper around flow.Mux that provides an API compatible with Bingo for registering routes.
 type Router struct {
 	*flow.Mux
+	Routes []Route
+}
+
+// Route represents a route in the router.
+type Route struct {
+	Methods []string
+	Path    string
 }
 
 // New returns a new Router instance with the default middleware stack:
@@ -23,8 +30,35 @@ func New() *Router {
 	mux := flow.New()
 	mux.Use(middleware.CtxData(), middleware.Recoverer())
 	return &Router{
-		Mux: mux,
+		Mux:    mux,
+		Routes: make([]Route, 0),
 	}
+}
+
+// Handle is used to register a route with the given pattern, handler, and methods.
+func (r *Router) Handle(pattern string, handler http.Handler, methods ...string) {
+	
+	// Register the route in the *Router.Routes
+	r.Routes = append(r.Routes, Route{
+		Methods: methods,
+		Path:    pattern,
+	})
+	
+	// Create the route
+	r.Mux.Handle(pattern, handler, methods...)
+}
+
+// HandleFunc is used to register a route with the given pattern, handler function, and methods.
+func (r *Router) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request), methods ...string) {
+	
+	// Register the route in the *Router.Routes
+	r.Routes = append(r.Routes, Route{
+		Methods: methods,
+		Path:    pattern,
+	})
+	
+	// Create the route
+	r.Mux.HandleFunc(pattern, handler, methods...)
 }
 
 // Group is used to create 'groups' of routes in a Mux. Middleware registered
@@ -59,11 +93,21 @@ type RouteOption func(*Router)
 //
 // It may accept RouteOption to add middleware.Binder and middleware.Validator.
 func (r *Router) Get(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	method := http.MethodGet
+	
+	// Register the route in the *Router.Routes
+	r.Routes = append(r.Routes, Route{
+		Methods: []string{method},
+		Path:    pattern,
+	})
+	
+	// Create the group and apply the RouteOptions
 	r.Group(func(router *Router) {
 		for _, opt := range opts {
 			opt(router)
 		}
-		router.HandleFunc(pattern, handler, http.MethodGet)
+		// Create the route
+		router.HandleFunc(pattern, handler, method)
 	})
 }
 
@@ -71,11 +115,21 @@ func (r *Router) Get(pattern string, handler http.HandlerFunc, opts ...RouteOpti
 //
 // It may accept RouteOption to add middleware.Binder and middleware.Validator.
 func (r *Router) Post(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	method := http.MethodPost
+	
+	// Register the route in the *Router.Routes
+	r.Routes = append(r.Routes, Route{
+		Methods: []string{method},
+		Path:    pattern,
+	})
+	
+	// Create the group and apply the RouteOptions
 	r.Group(func(router *Router) {
 		for _, opt := range opts {
 			opt(router)
 		}
-		router.HandleFunc(pattern, handler, http.MethodPost)
+		// Create the route
+		router.HandleFunc(pattern, handler, method)
 	})
 }
 
@@ -83,11 +137,21 @@ func (r *Router) Post(pattern string, handler http.HandlerFunc, opts ...RouteOpt
 //
 // It may accept RouteOption to add middleware.Binder and middleware.Validator.
 func (r *Router) Put(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	method := http.MethodPut
+	
+	// Register the route in the *Router.Routes
+	r.Routes = append(r.Routes, Route{
+		Methods: []string{method},
+		Path:    pattern,
+	})
+	
+	// Create the group and apply the RouteOptions
 	r.Group(func(router *Router) {
 		for _, opt := range opts {
 			opt(router)
 		}
-		router.HandleFunc(pattern, handler, http.MethodPut)
+		// Create the route
+		router.HandleFunc(pattern, handler, method)
 	})
 }
 
@@ -95,11 +159,21 @@ func (r *Router) Put(pattern string, handler http.HandlerFunc, opts ...RouteOpti
 //
 // It may accept RouteOption to add middleware.Binder and middleware.Validator.
 func (r *Router) Patch(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	method := http.MethodPatch
+	
+	// Register the route in the *Router.Routes
+	r.Routes = append(r.Routes, Route{
+		Methods: []string{method},
+		Path:    pattern,
+	})
+	
+	// Create the group and apply the RouteOptions
 	r.Group(func(router *Router) {
 		for _, opt := range opts {
 			opt(router)
 		}
-		router.HandleFunc(pattern, handler, http.MethodPatch)
+		// Create the route
+		router.HandleFunc(pattern, handler, method)
 	})
 }
 
@@ -107,11 +181,21 @@ func (r *Router) Patch(pattern string, handler http.HandlerFunc, opts ...RouteOp
 //
 // It may accept RouteOption to add middleware.Binder and middleware.Validator.
 func (r *Router) Delete(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	method := http.MethodDelete
+	
+	// Register the route in the *Router.Routes
+	r.Routes = append(r.Routes, Route{
+		Methods: []string{method},
+		Path:    pattern,
+	})
+	
+	// Create the group and apply the RouteOptions
 	r.Group(func(router *Router) {
 		for _, opt := range opts {
 			opt(router)
 		}
-		router.HandleFunc(pattern, handler, http.MethodDelete)
+		// Create the route
+		router.HandleFunc(pattern, handler, method)
 	})
 }
 

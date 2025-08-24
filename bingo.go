@@ -2,9 +2,11 @@ package bingo
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 	
 	"github.com/debarbarinantoine/bingo/internal/enum"
@@ -34,6 +36,7 @@ type Bingo struct {
 	Logger         zerolog.Logger
 	SessionManager *scs.SessionManager
 	JwtConfig      *jwtkit.Config
+	environment    string
 }
 
 // Options represents the configuration options for the Bingo server.
@@ -199,6 +202,9 @@ type Options struct {
 //
 func New(options Options) *Bingo {
 	var output io.Writer = os.Stdout
+	if options.Environment == "" {
+		options.Environment = "development"
+	}
 	if options.Environment != "production" {
 		output = zerolog.ConsoleWriter{Out: os.Stdout}
 	}
@@ -217,8 +223,9 @@ func New(options Options) *Bingo {
 	}
 	
 	return &Bingo{
-		Logger: log,
-		Router: r,
+		environment: options.Environment,
+		Logger:      log,
+		Router:      r,
 		Server: &http.Server{
 			Addr:              options.ServerAddr,
 			IdleTimeout:       time.Minute,
@@ -232,6 +239,14 @@ func New(options Options) *Bingo {
 
 // ListenAndServe starts the server and listens for incoming requests.
 func (b *Bingo) ListenAndServe() error {
+	if b.environment != "production" {
+		fmt.Println(":: [INFO] Registered routes:")
+		for _, route := range b.Router.Routes {
+			// GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|CONNECT|TRACE (max length: 52)
+			fmt.Printf("\t=> %52s  %s\n", strings.Join(route.Methods, "|"), route.Path)
+		}
+	}
+	b.Logger.Info().Str("address", b.Server.Addr).Msg("Starting server")
 	return b.Server.ListenAndServe()
 }
 
