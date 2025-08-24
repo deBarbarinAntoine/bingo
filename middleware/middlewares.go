@@ -3,6 +3,7 @@ package middleware
 import (
 	"errors"
 	"net/http"
+	"path"
 	"reflect"
 	"time"
 	
@@ -79,10 +80,22 @@ func AllowContentType(contentTypes ...string) Middleware {
 
 // CleanPath middleware will clean out double slash mistakes from a user's request path.
 // For example, if a user requests /users//1 or //users////1 will both be treated as: /users/1
-//
-// N.B.: it comes from go-chi/chi/v5/middleware library
 func CleanPath() Middleware {
-	return middleware.CleanPath
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var routePath string
+			if r.URL.RawPath != "" {
+				routePath = r.URL.RawPath
+			} else {
+				routePath = r.URL.Path
+			}
+			routePath = path.Clean(routePath)
+			r.URL.RawPath = routePath
+			r.URL.Path = routePath
+			
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // RealIP is a middleware that sets a http.Request's RemoteAddr to the results

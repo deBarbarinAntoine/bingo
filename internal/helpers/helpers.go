@@ -67,12 +67,18 @@ func ClientError(r *http.Request, w http.ResponseWriter, status int, err error, 
 	}, status)
 }
 
+// NotFoundHandler is a handler that writes a 404 Not Found response with a "route %s not found" message.
+var NotFoundHandler = http.HandlerFunc(NotFound)
+
+// MethodNotAllowedHandler is a handler that writes a 405 Method Not Allowed response with a "method %s not allowed" message.
+var MethodNotAllowedHandler = http.HandlerFunc(MethodNotAllowed)
+
 // NotFound writes a 404 Not Found response with a "route %s not found" message.
-func NotFound(r *http.Request, w http.ResponseWriter) {
+func NotFound(w http.ResponseWriter, r *http.Request) {
 	ClientError(r, w, http.StatusNotFound, fmt.Errorf("route %s not found", r.URL.Path), fmt.Sprintf("route %s not found", r.URL.Path))
 }
 
 // MethodNotAllowed writes a 405 Method Not Allowed response with a "method %s not allowed" message.
-func MethodNotAllowed(r *http.Request, w http.ResponseWriter) {
+func MethodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	ClientError(r, w, http.StatusMethodNotAllowed, fmt.Errorf("method %s not allowed", r.Method), fmt.Sprintf("method %s not allowed", r.Method))
 }

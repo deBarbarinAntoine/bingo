@@ -9,6 +9,7 @@ import (
 	"time"
 	
 	"github.com/debarbarinantoine/bingo/internal/enum"
+	"github.com/debarbarinantoine/bingo/internal/helpers"
 	"github.com/debarbarinantoine/bingo/jwtkit"
 	"github.com/debarbarinantoine/bingo/middleware"
 	"github.com/debarbarinantoine/bingo/sessions"
@@ -215,6 +216,8 @@ func New(options Options) *Bingo {
 	
 	// Initialize a new router
 	r := NewRouter()
+	r.NotFound = helpers.NotFoundHandler
+	r.MethodNotAllowed = helpers.MethodNotAllowedHandler
 	
 	// Apply the RealIP middleware if UseRealIP is true
 	if options.UseRealIP {
