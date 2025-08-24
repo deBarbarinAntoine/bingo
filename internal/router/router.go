@@ -4,12 +4,12 @@ import (
 	"net/http"
 	
 	"github.com/debarbarinantoine/bingo/binder"
-	"github.com/debarbarinantoine/bingo/internal/enum"
 	"github.com/debarbarinantoine/bingo/middleware"
 	
 	"github.com/alexedwards/flow"
 )
 
+// Router is a wrapper around flow.Mux that provides an API compatible with Bingo for registering routes.
 type Router struct {
 	*flow.Mux
 }
@@ -44,25 +44,102 @@ func (r *Router) Group(fn func(*Router)) {
 	})
 }
 
-func (r *Router) WithFormBindCtx(pattern string, handler http.HandlerFunc, dst any, key string, methods ...string) {
-	r.withBindCtx(dst, key, binder.WithBodyBinder(enum.Tags.Form), pattern, handler, methods...)
-}
+// RouteOption is a functional option that configures a route by adding
+// middleware to its handler chain. Each option wraps the route's handler
+// with specific middleware, such as for data binding or validation.
+//
+// For example, to bind JSON data to a struct and validate it:
+//
+//  router.Post("/users", userHandler,
+//      WithBinderAndValidator(&user.CreateDTO{}, "user"),
+//  )
+type RouteOption func(*Router)
 
-func (r *Router) WithMultipartFormBindCtx(pattern string, handler http.HandlerFunc, dst any, key string, methods ...string) {
-	r.withBindCtx(dst, key, binder.WithBodyBinder(enum.Tags.MultipartForm), pattern, handler, methods...)
-}
-
-func (r *Router) WithJsonBindCtx(pattern string, handler http.HandlerFunc, dst any, key string, methods ...string) {
-	r.withBindCtx(dst, key, binder.WithBodyBinder(enum.Tags.Json), pattern, handler, methods...)
-}
-
-func (r *Router) WithBindCtx(pattern string, handler http.HandlerFunc, dst any, key string, methods ...string) {
-	r.withBindCtx(dst, key, nil, pattern, handler, methods...)
-}
-
-func (r *Router) withBindCtx(dst any, key string, binderOptions []binder.MultiBinderOption, pattern string, handler http.HandlerFunc, methods ...string) {
+// Get is a shortcut for registering a GET route with the given pattern and handler.
+//
+// It may accept RouteOption to add middleware.Binder and middleware.Validator.
+func (r *Router) Get(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
 	r.Group(func(router *Router) {
-		router.Use(middleware.Binder(dst, key, binderOptions...))
-		router.HandleFunc(pattern, handler, methods...)
+		for _, opt := range opts {
+			opt(router)
+		}
+		router.HandleFunc(pattern, handler, http.MethodGet)
 	})
+}
+
+// Post is a shortcut for registering a POST route with the given pattern and handler.
+//
+// It may accept RouteOption to add middleware.Binder and middleware.Validator.
+func (r *Router) Post(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	r.Group(func(router *Router) {
+		for _, opt := range opts {
+			opt(router)
+		}
+		router.HandleFunc(pattern, handler, http.MethodPost)
+	})
+}
+
+// Put is a shortcut for registering a PUT route with the given pattern and handler.
+//
+// It may accept RouteOption to add middleware.Binder and middleware.Validator.
+func (r *Router) Put(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	r.Group(func(router *Router) {
+		for _, opt := range opts {
+			opt(router)
+		}
+		router.HandleFunc(pattern, handler, http.MethodPut)
+	})
+}
+
+// Patch is a shortcut for registering a PATCH route with the given pattern and handler.
+//
+// It may accept RouteOption to add middleware.Binder and middleware.Validator.
+func (r *Router) Patch(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	r.Group(func(router *Router) {
+		for _, opt := range opts {
+			opt(router)
+		}
+		router.HandleFunc(pattern, handler, http.MethodPatch)
+	})
+}
+
+// Delete is a shortcut for registering a DELETE route with the given pattern and handler.
+//
+// It may accept RouteOption to add middleware.Binder and middleware.Validator.
+func (r *Router) Delete(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
+	r.Group(func(router *Router) {
+		for _, opt := range opts {
+			opt(router)
+		}
+		router.HandleFunc(pattern, handler, http.MethodDelete)
+	})
+}
+
+// WithBinder is a route option that provides a Binder middleware with the given destination and key.
+func WithBinder(dst any, key string, options ...binder.MultiBinderOption) RouteOption {
+	return func(r *Router) {
+		r.Use(middleware.Binder(dst, key, options...))
+	}
+}
+
+// WithValidator is a route option that provides a Validator middleware for the data bound to the request with the given key.
+func WithValidator(key string) RouteOption {
+	return func(r *Router) {
+		r.Use(middleware.Validator(key))
+	}
+}
+
+// WithBinderAndValidator is a route option that provides a Binder and Validator middleware with the given destination and key.
+func WithBinderAndValidator(dst any, key string, options ...binder.MultiBinderOption) RouteOption {
+	return func(r *Router) {
+		r.Use(middleware.Binder(dst, key, options...))
+		r.Use(middleware.Validator(key))
+	}
+}
+
+// WithMiddleware is a route option that applies the given middleware(s) to the route.
+func WithMiddleware(middleware ...func(http.Handler) http.Handler) RouteOption {
+	return func(r *Router) {
+		r.Use(middleware...)
+	}
 }

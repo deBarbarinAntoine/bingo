@@ -1,16 +1,23 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"reflect"
 	"time"
 	
 	"github.com/debarbarinantoine/bingo/binder"
 	"github.com/debarbarinantoine/bingo/internal/ctx"
+	"github.com/debarbarinantoine/bingo/internal/helpers"
+	"github.com/rs/zerolog/hlog"
 	
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httprate"
+	"github.com/go-playground/locales/en"
+	ut "github.com/go-playground/universal-translator"
+	"github.com/go-playground/validator/v10"
+	entranslations "github.com/go-playground/validator/v10/translations/en"
 	"github.com/justinas/nosurf"
 )
 
@@ -262,13 +269,66 @@ func Binder(dst any, key string, binderOptions ...binder.MultiBinderOption) Midd
 			newDst := reflect.New(dstType.Elem()).Interface()
 			
 			dataBinder, err := binder.NewMultiBinder(newDst, r, binderOptions...)
+			if err != nil {
+				helpers.ClientError(r, w, http.StatusBadRequest, err, http.StatusText(http.StatusBadRequest))
+				return
+			}
 			
 			err = dataBinder.Fetch()
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				helpers.ClientError(r, w, http.StatusBadRequest, err, http.StatusText(http.StatusBadRequest))
 				return
 			}
 			r = ctx.SetData(r, key, newDst)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// Validator is a middleware that validates the data bound to the request context using the provided key.
+//
+// If there are issues setting up the english translator used to generate good error messages, it may panic.
+//
+// N.B.: it uses the go-playground/validator/v10 library
+func Validator(key string) Middleware {
+	enTranslator := en.New()
+	universalTranslator := ut.New(enTranslator, enTranslator)
+	trans, ok := universalTranslator.GetTranslator("en")
+	if !ok {
+		// Panic if the translator is not found (middleware is called when setting up the server, so it's okay to panic)
+		panic("translator not found")
+	}
+	
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	err := entranslations.RegisterDefaultTranslations(validate, trans)
+	if err != nil {
+		// Panic if the translator doesn't get registered (middleware is called when setting up the server, so it's okay to panic)
+		panic(err)
+	}
+	
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			
+			// Get the data from the context and validate it
+			data := ctx.GetData(r.Context(), key)
+			
+			// Only validate if the data is not nil
+			if data != nil {
+				err = validate.Struct(data)
+				if err != nil {
+					
+					var errs validator.ValidationErrors
+					if errors.As(err, &errs) {
+						
+						// Log and return an error response to the client
+						errorsMap := errs.Translate(trans)
+						hlog.FromRequest(r).Warn().Any("errors", errorsMap).Msg("Incoming data validation failed")
+						helpers.Json(r, w, helpers.H{"status": http.StatusBadRequest, "message": "Data validation failed", "errors": errorsMap}, http.StatusBadRequest)
+						return
+					}
+				}
+			}
+			
 			next.ServeHTTP(w, r)
 		})
 	}

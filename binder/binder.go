@@ -9,7 +9,10 @@ type TextUnmarshaler interface {
 	UnmarshalText(text []byte) error
 }
 
+// Binder is an interface for binding data from a source to a destination struct.
 type Binder interface {
+	
+	// Fetch fetches data from the source and binds it to the destination struct.
 	Fetch() error
 }
 
@@ -23,20 +26,24 @@ type dataBind struct {
 	FetchData func(bind *dataBind, src any) error
 }
 
+// BindOption is a function that configures a dataBind instance.
 type BindOption func(bind *dataBind)
 
+// WithCustomFetcher sets a custom fetcher function for the dataBind instance.
 func WithCustomFetcher(fetcher func(bind *dataBind, src any) error) BindOption {
 	return func(bind *dataBind) {
 		bind.FetchData = fetcher
 	}
 }
 
+// WithCustomMaxMemory sets a custom maximum memory limit for the multipart form data in the dataBind instance.
 func WithCustomMaxMemory(maxMemory int64) BindOption {
 	return func(bind *dataBind) {
 		bind.MaxMemory = maxMemory
 	}
 }
 
+// Fetch fetches data from the source and binds it to the destination struct.
 func (b *dataBind) Fetch() error {
 	
 	// Fetch data from src

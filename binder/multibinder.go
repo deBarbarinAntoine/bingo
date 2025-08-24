@@ -6,6 +6,7 @@ import (
 	"github.com/debarbarinantoine/bingo/internal/enum"
 )
 
+// MultiBinder is a struct that contains multiple binders for different data sources.
 type MultiBinder struct {
 	QueryBinder         *Query
 	FormBinder          *Form
@@ -16,23 +17,34 @@ type MultiBinder struct {
 	JSONBinder          *JSON
 }
 
+// MultiBinderOption is a function that configures a MultiBinder instance.
 type MultiBinderOption func(mb *MultiBinder)
 
-func WithBodyBinder(tag enum.Tag) []MultiBinderOption {
-	binderOptions := make([]MultiBinderOption, 0, 3)
-	switch tag {
-	case enum.Tags.Form:
-		binderOptions = append(binderOptions, WithoutMultipartFormBinder(), WithoutJSONBinder())
-	case enum.Tags.MultipartForm:
-		binderOptions = append(binderOptions, WithoutFormBinder(), WithoutJSONBinder())
-	case enum.Tags.Json:
-		binderOptions = append(binderOptions, WithoutMultipartFormBinder(), WithoutFormBinder())
-	default:
-		return nil
+// WithJsonBodyBinder only keeps the JSON binder for the MultiBinder instance.
+func WithJsonBodyBinder() MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.FormBinder = nil
+		mb.MultipartFormBinder = nil
 	}
-	return binderOptions
 }
 
+// WithFormBodyBinder only keeps the form binder for the MultiBinder instance.
+func WithFormBodyBinder() MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.JSONBinder = nil
+		mb.MultipartFormBinder = nil
+	}
+}
+
+// WithMultipartFormBodyBinder only keeps the multipart form binder for the MultiBinder instance.
+func WithMultipartFormBodyBinder() MultiBinderOption {
+	return func(mb *MultiBinder) {
+		mb.JSONBinder = nil
+		mb.FormBinder = nil
+	}
+}
+
+// WithoutBodyBinder sets the body binders for the MultiBinder instance to nil.
 func WithoutBodyBinder() MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.JSONBinder = nil
@@ -41,60 +53,70 @@ func WithoutBodyBinder() MultiBinderOption {
 	}
 }
 
+// WithCustomQueryBinder sets a custom query binder for the MultiBinder instance.
 func WithCustomQueryBinder(customBinder *Query) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.QueryBinder = customBinder
 	}
 }
 
+// WithCustomMultipartBinder sets a custom multipart form binder for the MultiBinder instance.
 func WithCustomMultipartBinder(customBinder *MultipartForm) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.MultipartFormBinder = customBinder
 	}
 }
 
+// WithCustomFormBinder sets a custom form binder for the MultiBinder instance.
 func WithCustomFormBinder(customBinder *Form) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.FormBinder = customBinder
 	}
 }
 
+// WithCustomUrlParamBinder sets a custom URL param binder for the MultiBinder instance.
 func WithCustomUrlParamBinder(customBinder *UrlParam) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.UrlParamBinder = customBinder
 	}
 }
 
+// WithCustomHeaderBinder sets a custom header binder for the MultiBinder instance.
 func WithCustomHeaderBinder(customBinder *Header) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.HeaderBinder = customBinder
 	}
 }
 
+// WithCustomCookieBinder sets a custom cookie binder for the MultiBinder instance.
 func WithCustomCookieBinder(customBinder *Cookie) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.CookieBinder = customBinder
 	}
 }
 
+// WithCustomJSONBinder sets a custom JSON binder for the MultiBinder instance.
 func WithCustomJSONBinder(customBinder *JSON) MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.JSONBinder = customBinder
 	}
 }
 
+// WithoutJSONBinder removes the JSON binder from the MultiBinder instance.
 func WithoutJSONBinder() MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.JSONBinder = nil
 	}
 }
 
+// WithoutFormBinder removes the form binder from the MultiBinder instance.
 func WithoutFormBinder() MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.FormBinder = nil
 	}
 }
 
+// WithoutMultipartFormBinder removes the multipart form binder from the MultiBinder instance.
 func WithoutMultipartFormBinder() MultiBinderOption {
 	return func(mb *MultiBinder) {
 		mb.MultipartFormBinder = nil
@@ -178,6 +200,7 @@ func (mb *MultiBinder) createBinders(dst any, src *http.Request) error {
 	return nil
 }
 
+// Fetch fetches data from the source and binds it to the destination struct.
 func (mb *MultiBinder) Fetch() error {
 	if mb.JSONBinder != nil {
 		if err := mb.JSONBinder.Fetch(); err != nil {
