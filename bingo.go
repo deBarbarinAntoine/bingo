@@ -246,7 +246,7 @@ func (b *Bingo) ListenAndServe() error {
 		b.Router.PrintRoutes()
 		fmt.Println()
 	}
-	b.Logger.Info().Str("address", b.Server.Addr).Msg("Starting server")
+	b.Logger.Info().Msg("Starting server")
 	return b.Server.ListenAndServe()
 }
 
