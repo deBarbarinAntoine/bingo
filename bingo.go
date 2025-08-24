@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 	
 	"github.com/debarbarinantoine/bingo/internal/enum"
@@ -241,10 +240,8 @@ func New(options Options) *Bingo {
 func (b *Bingo) ListenAndServe() error {
 	if b.environment != "production" {
 		fmt.Println(":: [INFO] Registered routes:")
-		for _, route := range b.Router.Routes {
-			// GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|CONNECT|TRACE (max length: 52)
-			fmt.Printf("\t=> %52s  %s\n", strings.Join(route.Methods, "|"), route.Path)
-		}
+		b.Router.PrintRoutes()
+		fmt.Println()
 	}
 	b.Logger.Info().Str("address", b.Server.Addr).Msg("Starting server")
 	return b.Server.ListenAndServe()

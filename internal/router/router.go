@@ -1,7 +1,9 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	
 	"github.com/debarbarinantoine/bingo/binder"
 	"github.com/debarbarinantoine/bingo/middleware"
@@ -12,7 +14,7 @@ import (
 // Router is a wrapper around flow.Mux that provides an API compatible with Bingo for registering routes.
 type Router struct {
 	*flow.Mux
-	Routes []Route
+	routes []Route
 }
 
 // Route represents a route in the router.
@@ -31,15 +33,45 @@ func New() *Router {
 	mux.Use(middleware.CtxData(), middleware.Recoverer())
 	return &Router{
 		Mux:    mux,
-		Routes: make([]Route, 0),
+		routes: make([]Route, 0),
+	}
+}
+
+// Routes returns the registered routes.
+func (r *Router) Routes() []Route {
+	return r.routes
+}
+
+// PrintRoutes prints the registered routes.
+func (r *Router) PrintRoutes() {
+	methodsMaxLength := 0
+	routes := make([]struct {
+		method string
+		path   string
+	}, 0, len(r.routes))
+	for _, route := range r.routes {
+		method := strings.Join(route.Methods, "|")
+		if len(method) > methodsMaxLength {
+			methodsMaxLength = len(method)
+		}
+		routes = append(routes, struct {
+			method string
+			path   string
+		}{
+			method: method,
+			path:   route.Path,
+		})
+	}
+	for _, route := range routes {
+		fmt.Printf("\t=> %-*s  %s\n", methodsMaxLength, route.method, route.path)
 	}
 }
 
 // Handle is used to register a route with the given pattern, handler, and methods.
 func (r *Router) Handle(pattern string, handler http.Handler, methods ...string) {
 	
-	// Register the route in the *Router.Routes
-	r.Routes = append(r.Routes, Route{
+	// Register the route in the *Router.routes
+	r.routes = append(r.routes, Route{
 		Methods: methods,
 		Path:    pattern,
 	})
@@ -51,8 +83,8 @@ func (r *Router) Handle(pattern string, handler http.Handler, methods ...string)
 // HandleFunc is used to register a route with the given pattern, handler function, and methods.
 func (r *Router) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request), methods ...string) {
 	
-	// Register the route in the *Router.Routes
-	r.Routes = append(r.Routes, Route{
+	// Register the route in the *Router.routes
+	r.routes = append(r.routes, Route{
 		Methods: methods,
 		Path:    pattern,
 	})
@@ -95,8 +127,8 @@ type RouteOption func(*Router)
 func (r *Router) Get(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
 	method := http.MethodGet
 	
-	// Register the route in the *Router.Routes
-	r.Routes = append(r.Routes, Route{
+	// Register the route in the *Router.routes
+	r.routes = append(r.routes, Route{
 		Methods: []string{method},
 		Path:    pattern,
 	})
@@ -117,8 +149,8 @@ func (r *Router) Get(pattern string, handler http.HandlerFunc, opts ...RouteOpti
 func (r *Router) Post(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
 	method := http.MethodPost
 	
-	// Register the route in the *Router.Routes
-	r.Routes = append(r.Routes, Route{
+	// Register the route in the *Router.routes
+	r.routes = append(r.routes, Route{
 		Methods: []string{method},
 		Path:    pattern,
 	})
@@ -139,8 +171,8 @@ func (r *Router) Post(pattern string, handler http.HandlerFunc, opts ...RouteOpt
 func (r *Router) Put(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
 	method := http.MethodPut
 	
-	// Register the route in the *Router.Routes
-	r.Routes = append(r.Routes, Route{
+	// Register the route in the *Router.routes
+	r.routes = append(r.routes, Route{
 		Methods: []string{method},
 		Path:    pattern,
 	})
@@ -161,8 +193,8 @@ func (r *Router) Put(pattern string, handler http.HandlerFunc, opts ...RouteOpti
 func (r *Router) Patch(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
 	method := http.MethodPatch
 	
-	// Register the route in the *Router.Routes
-	r.Routes = append(r.Routes, Route{
+	// Register the route in the *Router.routes
+	r.routes = append(r.routes, Route{
 		Methods: []string{method},
 		Path:    pattern,
 	})
@@ -183,8 +215,8 @@ func (r *Router) Patch(pattern string, handler http.HandlerFunc, opts ...RouteOp
 func (r *Router) Delete(pattern string, handler http.HandlerFunc, opts ...RouteOption) {
 	method := http.MethodDelete
 	
-	// Register the route in the *Router.Routes
-	r.Routes = append(r.Routes, Route{
+	// Register the route in the *Router.routes
+	r.routes = append(r.routes, Route{
 		Methods: []string{method},
 		Path:    pattern,
 	})
