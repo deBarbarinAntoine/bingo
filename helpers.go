@@ -25,11 +25,11 @@ func ClientError(r *http.Request, w http.ResponseWriter, status int, err error, 
 }
 
 // NotFound writes a 404 Not Found response with a "route %s not found" message.
-func NotFound(r *http.Request, w http.ResponseWriter) {
-	helpers.NotFound(r, w)
+func NotFound(w http.ResponseWriter, r *http.Request) {
+	helpers.NotFound(w, r)
 }
 
 // MethodNotAllowed writes a 405 Method Not Allowed response with a "method %s not allowed" message.
-func MethodNotAllowed(r *http.Request, w http.ResponseWriter) {
-	helpers.MethodNotAllowed(r, w)
+func MethodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	helpers.MethodNotAllowed(w, r)
 }
