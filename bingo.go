@@ -258,6 +258,7 @@ func New(options Options) *Bingo {
 	}
 }
 
+// Background runs a function in a separate goroutine adding it in the bingo's sync.WaitGroup and recovering from panics.
 func (b *Bingo) Background(fn func()) {
 	b.wg.Add(1)
 	go func() {
@@ -272,6 +273,8 @@ func (b *Bingo) Background(fn func()) {
 }
 
 // ListenAndServe starts the server and listens for incoming requests.
+//
+// It handles graceful shutdown and waits for background tasks to complete for 30 seconds.
 func (b *Bingo) ListenAndServe() error {
 	if b.environment != "production" {
 		fmt.Println(":: [INFO] Registered routes:")
