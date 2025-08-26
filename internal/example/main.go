@@ -22,15 +22,15 @@ import (
 
 // Publication represents a nested struct in the multipart data.
 type Publication struct {
-	Title string    `multipart:"title" json:"title" validate:"required"`
-	Score float64   `multipart:"score" json:"score" validate:"required,min=0,max=10"`
-	Date  time.Time `multipart:"date" json:"date"`
+	Title string    `multipart:"title" json:"title" validate:"required,min=2,max=255"`
+	Score float64   `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+	Date  time.Time `multipart:"date" json:"date" validate:"required"`
 }
 
 // Info represents another nested struct, containing a slice of Publication.
 type Info struct {
-	Id           uint          `multipart:"id" json:"id" validate:"required,min=1"`
-	Publications []Publication `multipart:"publications" json:"publications"`
+	Id           uint          `multipart:"id" json:"id" validate:"required,gt=0"`
+	Publications []Publication `multipart:"publications" json:"publications" validate:"required,dive"`
 }
 
 // Data shows how to bind various data types from different request sources.
@@ -43,12 +43,12 @@ type Info struct {
 type Data struct {
 	Session   string                `cookie:"session" json:"session" validate:"required,uuid"`
 	CSRFToken string                `header:"x-csrf-token" json:"x-csrf-token"`
-	Id        uint                  `param:"id" json:"id" validate:"required,min=1"`
-	Name      string                `query:"name" json:"name" validate:"required"`
-	Age       int                   `multipart:"age" json:"age" validate:"required,min=0,max=120"`
+	Id        uint                  `param:"id" json:"id" validate:"required,gt=0"`
+	Name      string                `query:"name" json:"name" validate:"required,min=2,max=100"`
+	Age       int                   `multipart:"age" json:"age" validate:"required,gt=0,lte=120"`
 	IsAdmin   bool                  `multipart:"is_admin" json:"is_admin"`
-	Score     float64               `multipart:"score" json:"score" validate:"required,min=0,max=10"`
-	Info      Info                  `multipart:"info" json:"info"`
+	Score     float64               `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+	Info      Info                  `multipart:"info" json:"info" validate:"required,dive"`
 	File      *multipart.FileHeader `multipart:"file" json:"file"`
 }
 
@@ -112,7 +112,6 @@ func main() {
 	
 	// Use global middlewares.
 	srv.Router.Use(
-		middleware.CleanPath(),
 		middleware.RedirectSlashes(),
 		middleware.Timeout(time.Minute),
 		middleware.ThrottleBacklog(100, 500, time.Minute),

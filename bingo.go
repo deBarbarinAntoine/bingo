@@ -1,11 +1,16 @@
 package bingo
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 	
 	"github.com/debarbarinantoine/bingo/internal/enum"
@@ -37,6 +42,7 @@ type Bingo struct {
 	SessionManager *scs.SessionManager
 	JwtConfig      *jwtkit.Config
 	environment    string
+	wg             *sync.WaitGroup
 }
 
 // Options represents the configuration options for the Bingo server.
@@ -77,6 +83,7 @@ type Options struct {
 //	"time"
 //
 //	"github.com/debarbarinantoine/bingo"
+//	"github.com/debarbarinantoine/bingo/binder"
 //	"github.com/debarbarinantoine/bingo/jwtkit"
 //	"github.com/debarbarinantoine/bingo/middleware"
 //
@@ -85,40 +92,53 @@ type Options struct {
 //
 // // Publication represents a nested struct in the multipart data.
 // type Publication struct {
-//	Title string    `multipart:"title" json:"title"`
-//	Score float64   `multipart:"score" json:"score"`
-//	Date  time.Time `multipart:"date" json:"date"`
+//	Title string    `multipart:"title" json:"title" validate:"required,min=2,max=255"`
+//	Score float64   `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+//	Date  time.Time `multipart:"date" json:"date" validate:"required"`
 // }
 //
 // // Info represents another nested struct, containing a slice of Publication.
 // type Info struct {
-//	Id           uint          `multipart:"id" json:"id"`
-//	Publications []Publication `multipart:"publications" json:"publications"`
+//	Id           uint          `multipart:"id" json:"id" validate:"required,gt=0"`
+//	Publications []Publication `multipart:"publications" json:"publications" validate:"required,dive"`
 // }
 //
 // // Data shows how to bind various data types from different request sources.
-// // The `multipart` tag is used for form data.
+// //
+// // The `multipart` tag is used for multipart form data.
 // // The `cookie`, `header`, `param`, and `query` tags are for other request sources.
+// //
+// // The `validate` tag is used for data validation
+// // (see the go-playground/validator/v10 documentation for more details).
 // type Data struct {
-//	Session   string                `cookie:"session" json:"session"`
+//	Session   string                `cookie:"session" json:"session" validate:"required,uuid"`
 //	CSRFToken string                `header:"x-csrf-token" json:"x-csrf-token"`
-//	Id        uint                  `param:"id" json:"id"`
-//	Name      string                `query:"name" json:"name"`
-//	Age       int                   `multipart:"age" json:"age"`
+//	Id        uint                  `param:"id" json:"id" validate:"required,gt=0"`
+//	Name      string                `query:"name" json:"name" validate:"required,min=2,max=100"`
+//	Age       int                   `multipart:"age" json:"age" validate:"required,gt=0,lte=120"`
 //	IsAdmin   bool                  `multipart:"is_admin" json:"is_admin"`
-//	Score     float64               `multipart:"score" json:"score"`
-//	Info      Info                  `multipart:"info" json:"info"`
+//	Score     float64               `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+//	Info      Info                  `multipart:"info" json:"info" validate:"required,dive"`
 //	File      *multipart.FileHeader `multipart:"file" json:"file"`
 // }
 //
-// // handler processes the bound data and sends a JSON response.
+// // ping is a handler for a common route without data.
+// func ping(w http.ResponseWriter, r *http.Request) {
+//	// Respond to the client with a JSON message using the bingo.Json helper and bingo.H type (shortcut for map[string]any).
+//	bingo.Json(r, w, bingo.H{"message": "pong"}, http.StatusOK)
+// }
+//
+// // handler processes the bound and verified data and sends a JSON response.
 // func handler(w http.ResponseWriter, r *http.Request) {
 //	// Retrieve the bound data from the request context.
 //	data, ok := bingo.GetCtxData(r.Context(), "data").(*Data)
 //	if !ok {
+//		// Return an `Internal Server Error` with the bingo.ServerError helper.
 //		bingo.ServerError(r, w, fmt.Errorf("no data found in context"), "no data")
 //		return
 //	}
+//
+//	// Log at the info level with the data set by the Log middleware and the following message.
 //	hlog.FromRequest(r).Info().Msg("Request received successfully")
 //
 //	// Check if a file was uploaded and log its details.
@@ -133,11 +153,6 @@ type Options struct {
 //
 //	// Respond to the client with the bound data in JSON format.
 //	bingo.Json(r, w, data, http.StatusOK)
-// }
-//
-// // ping is a handler for a common route without data.
-// func ping(w http.ResponseWriter, r *http.Request) {
-//	bingo.Json(r, w, bingo.H{"message": "pong"}, http.StatusOK)
 // }
 //
 // // admin is a handler for a restricted route.
@@ -155,8 +170,9 @@ type Options struct {
 //	// Initialize the server and chain builder methods to add middleware.
 //	// The "With..." methods use a builder pattern to configure the server.
 //	srv, err := bingo.New(bingo.Options{
-//		ServerAddr:  "localhost:8080",
+//		ServerAddr:  "localhost:8008",
 //		Environment: "development",
+//		UseRealIP:   true,
 //	}).
 //		WithLogMiddleware().
 //		WithJWT(jwtConfig)
@@ -166,16 +182,16 @@ type Options struct {
 //
 //	// Use global middlewares.
 //	srv.Router.Use(
-//		middleware.RealIP(),
-//		middleware.CleanPath(),
 //		middleware.RedirectSlashes(),
 //		middleware.Timeout(time.Minute),
 //		middleware.ThrottleBacklog(100, 500, time.Minute),
 //		middleware.RateLimiterByIP(30, time.Minute),
 //	)
 //
-//	// public endpoint with a URL parameter (id) that has a regex match, and data binding.
-//	srv.Router.WithMultipartFormBindCtx("/:id|\\d+", handler, &Data{}, "data", http.MethodPost)
+//	// public endpoint with a URL parameter (id) that has a regex match.
+//	//
+//	// Uses the *Router.Post() method with the `bingo.WithBinderAndValidator()` functional option to bind and validate data.
+//	srv.Router.Post("/:id|\\d+", handler, bingo.WithBinderAndValidator(&Data{}, "data", binder.WithoutJSONBinder()))
 //
 //	// grouped routes that may have specific middlewares applied.
 //	srv.Router.Group(func(router *bingo.Router) {
@@ -185,13 +201,15 @@ type Options struct {
 //		router.Use(jwtkit.VerifyAndAuthenticateJWT())
 //
 //		// Restricted route, requires JWT authentication.
-//		router.HandleFunc("/admin", admin, http.MethodGet)
+//		// Uses the *Router.Get() method
+//		router.Get("/admin", admin)
 //
 //		// Any following route will be restricted by the JWT middleware.
 //		// ...
 //	})
 //
 //	// public endpoint, not affected by the group set before.
+//	// Uses the *Router.HandleFunc() method corresponding to the native http.HandleFunc method
 //	srv.Router.HandleFunc("/ping", ping, http.MethodGet)
 //
 //	// Start the server and listen for incoming requests.
@@ -226,6 +244,7 @@ func New(options Options) *Bingo {
 	
 	return &Bingo{
 		environment: options.Environment,
+		wg:          new(sync.WaitGroup),
 		Logger:      log,
 		Router:      r,
 		Server: &http.Server{
@@ -239,6 +258,19 @@ func New(options Options) *Bingo {
 	}
 }
 
+func (b *Bingo) Background(fn func()) {
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				b.Logger.Error().Any("panic", err).Msg("Background function panicked")
+			}
+		}()
+		fn()
+	}()
+}
+
 // ListenAndServe starts the server and listens for incoming requests.
 func (b *Bingo) ListenAndServe() error {
 	if b.environment != "production" {
@@ -246,8 +278,48 @@ func (b *Bingo) ListenAndServe() error {
 		b.Router.PrintRoutes()
 		fmt.Println()
 	}
-	b.Logger.Info().Msg("Starting server")
-	return b.Server.ListenAndServe()
+	
+	// setting the error channel to shut the server down
+	shutdownError := make(chan error)
+	
+	go func() {
+		
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		s := <-quit
+		
+		b.Logger.Info().Str("signal", s.String()).Msg("Shutting server down")
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		err := b.Server.Shutdown(ctx)
+		if err != nil {
+			shutdownError <- err
+		}
+		
+		b.Logger.Info().Msg("Completing background tasks")
+		
+		b.wg.Wait()
+		shutdownError <- nil
+	}()
+	
+	b.Logger.Info().Str("env", b.environment).Msg("Starting server")
+	
+	// run the server
+	err := b.Server.ListenAndServe()
+	if !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	
+	err = <-shutdownError
+	if err != nil {
+		return err
+	}
+	
+	b.Logger.Info().Msg("Portfolio server shutdown")
+	
+	return nil
 }
 
 // UseLogMiddleware adds a middleware to load logger in the request context.

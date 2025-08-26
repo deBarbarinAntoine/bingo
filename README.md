@@ -1,4 +1,6 @@
-### BinGo - A Go Web Library ⚡
+
+
+### ![Bingo Logo](logox32.png) BinGo - A Go Web Library
 
 BinGo is a highly flexible and extensible web library for Go, designed for rapid development of robust and scalable web services. It's built on idiomatic Go principles and provides a clear, modular architecture with sensible defaults.
 
@@ -44,33 +46,33 @@ Use with caution.
 
 ### 🤔 Why Choose BinGo?
 
-BinGo strikes the perfect balance between **developer productivity** and **Go's philosophy** of simplicity. Here's what sets it apart:
+**BinGo** strikes the perfect balance between **developer productivity** and **Go's philosophy** of simplicity. Here's what sets it apart:
 
 #### **🚀 Eliminates Boilerplate Without Magic**
 Instead of writing repetitive parsing and validation code:
 ```go
 // Traditional approach - lots of manual work
 func handler(w http.ResponseWriter, r *http.Request) {
-    id, err := strconv.Atoi(chi.URLParam(r, "id"))
+    id, err := strconv.Atoi(r.PathValue("id"))
     if err != nil {
-        http.Error(w, "Invalid ID", 400)
+        http.Error(w, "Invalid ID", http.StatusBadRequest)
         return
     }
     
     email := r.FormValue("email")
     if email == "" {
-        http.Error(w, "Email required", 400)
+        http.Error(w, "Email required", http.StatusBadRequest)
         return
     }
     
     if !isValidEmail(email) {
-        http.Error(w, "Invalid email", 400)
+        http.Error(w, "Invalid email", http.StatusBadRequest)
         return
     }
     
     age, err := strconv.Atoi(r.FormValue("age"))
     if err != nil || age < 0 {
-        http.Error(w, "Invalid age", 400)
+        http.Error(w, "Invalid age", http.StatusBadRequest)
         return
     }
     
@@ -82,9 +84,9 @@ BinGo reduces this to:
 ```go
 // BinGo approach - focus on business logic
 type UserData struct {
-    ID    int    `param:"id" validate:"required,min=1"`
+    ID    int    `param:"id" validate:"required,gt=0"`
     Email string `form:"email" validate:"required,email"`
-    Age   int    `form:"age" validate:"required,min=0"`
+    Age   int    `form:"age" validate:"required,gte=0"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +99,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 - **Battle-tested dependencies**: Built on proven libraries like `zerolog`, `go-playground/validator`, and `alexedwards/flow`
 - **Secure defaults**: CSRF protection, rate limiting, and proper error handling out of the box
 - **Type safety**: Automatic type conversion with validation prevents runtime errors
+- **Panic Recovery**: Built-in panic recovery middleware and graceful server shutdown
+- **Concurrency helper**: Built-in function to spawn goroutines with recovery feature and wait group when shutting server down.
 
 #### **🧩 True Modularity**
 Unlike monolithic frameworks, BinGo is **composable**:
@@ -118,15 +122,15 @@ Unlike monolithic frameworks, BinGo is **composable**:
 
 #### **🆚 How It Compares**
 
-| Feature                     | BinGo     | Gin      | Echo     | Chi     | net/http  |
-|-----------------------------|-----------|----------|----------|---------|-----------|
-| Learning Curve              | Low       | Medium   | Medium   | Low     | Low       |
-| Boilerplate                 | Minimal   | Low      | Low      | High    | Very High |
-| Data Binding                | Built-in  | Built-in | Built-in | Manual  | Manual    |
-| Validation                  | Automatic | Manual   | Manual   | Manual  | Manual    |
-| Standard Library Compatible | ✅         | ❌        | ❌        | ✅       | ✅         |
-| Middleware Ecosystem        | Curated   | Large    | Large    | Large   | DIY       |
-| Performance Overhead        | Minimal   | Low      | Low      | Minimal | None      |
+| Feature                     | BinGo    | Gin      | Echo     | Chi     | net/http  |
+|-----------------------------|----------|----------|----------|---------|-----------|
+| Learning Curve              | Low      | Medium   | Medium   | Low     | Low       |
+| Boilerplate                 | Minimal  | Low      | Low      | High    | Very High |
+| Data Binding                | Built-in | Built-in | Built-in | Manual  | Manual    |
+| Validation                  | Built-in | Manual   | Manual   | Manual  | Manual    |
+| Standard Library Compatible | ✅        | ❌        | ❌        | ✅       | ✅         |
+| Middleware Ecosystem        | Curated  | Large    | Large    | Large   | DIY       |
+| Performance Overhead        | Minimal  | Low      | Low      | Minimal | None      |
 
 **Perfect for:**
 - REST APIs that need robust input validation
@@ -191,7 +195,6 @@ func main() {
 	
 	// Use global middlewares.
 	srv.Router.Use(
-		middleware.CleanPath(),
 		middleware.RedirectSlashes(),
 		middleware.Timeout(time.Minute),
 		middleware.ThrottleBacklog(100, 500, time.Minute),
@@ -220,12 +223,12 @@ import (
 )
 
 type MyRequestData struct {
-    UserID  int     `param:"user_id" validate:"required,min=1"`
+    UserID  int     `param:"user_id" validate:"required,gt=0"`
     Query   string  `query:"q"`
     Email   string  `json:"email" validate:"required,email"`
     File    *multipart.FileHeader `multipart:"file"`
-    AuthToken string `header:"Authorization"`
-    SessionID string `cookie:"session_id" validate:"required"`
+    AuthToken string `header:"Authorization" validate:"required"`
+    SessionID string `cookie:"session_id" validate:"required,len=32"`
 }
 ```
 
@@ -245,7 +248,7 @@ import (
 
 type User struct {
     Name string `json:"name" validate:"required"`
-    Age  int    `param:"age" validate:"required,min=16,max=120"`
+    Age  int    `param:"age" validate:"required,lte=16,gte=120"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -294,15 +297,15 @@ import (
 
 // Publication represents a nested struct in the multipart data.
 type Publication struct {
-	Title string    `multipart:"title" json:"title" validate:"required"`
-	Score float64   `multipart:"score" json:"score" validate:"required,min=0,max=10"`
-	Date  time.Time `multipart:"date" json:"date"`
+	Title string    `multipart:"title" json:"title" validate:"required,min=2,max=255"`
+	Score float64   `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+	Date  time.Time `multipart:"date" json:"date" validate:"required"`
 }
 
 // Info represents another nested struct, containing a slice of Publication.
 type Info struct {
-	Id           uint          `multipart:"id" json:"id" validate:"required,min=1"`
-	Publications []Publication `multipart:"publications" json:"publications"`
+	Id           uint          `multipart:"id" json:"id" validate:"required,gt=0"`
+	Publications []Publication `multipart:"publications" json:"publications" validate:"required,dive"`
 }
 
 // Data shows how to bind various data types from different request sources.
@@ -315,12 +318,12 @@ type Info struct {
 type Data struct {
 	Session   string                `cookie:"session" json:"session" validate:"required,uuid"`
 	CSRFToken string                `header:"x-csrf-token" json:"x-csrf-token"`
-	Id        uint                  `param:"id" json:"id" validate:"required,min=1"`
-	Name      string                `query:"name" json:"name" validate:"required"`
-	Age       int                   `multipart:"age" json:"age" validate:"required,min=0,max=120"`
+	Id        uint                  `param:"id" json:"id" validate:"required,gt=0"`
+	Name      string                `query:"name" json:"name" validate:"required,min=2,max=100"`
+	Age       int                   `multipart:"age" json:"age" validate:"required,gt=0,lte=120"`
 	IsAdmin   bool                  `multipart:"is_admin" json:"is_admin"`
-	Score     float64               `multipart:"score" json:"score" validate:"required,min=0,max=10"`
-	Info      Info                  `multipart:"info" json:"info"`
+	Score     float64               `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+	Info      Info                  `multipart:"info" json:"info" validate:"required,dive"`
 	File      *multipart.FileHeader `multipart:"file" json:"file"`
 }
 
@@ -384,7 +387,6 @@ func main() {
 	
 	// Use global middlewares.
 	srv.Router.Use(
-		middleware.CleanPath(),
 		middleware.RedirectSlashes(),
 		middleware.Timeout(time.Minute),
 		middleware.ThrottleBacklog(100, 500, time.Minute),
