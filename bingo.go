@@ -12,13 +12,13 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	
+
 	"github.com/debarbarinantoine/bingo/internal/enum"
 	"github.com/debarbarinantoine/bingo/internal/helpers"
 	"github.com/debarbarinantoine/bingo/jwtkit"
 	"github.com/debarbarinantoine/bingo/middleware"
 	"github.com/debarbarinantoine/bingo/sessions"
-	
+
 	"github.com/alexedwards/scs/gormstore"
 	"github.com/alexedwards/scs/mongodbstore"
 	"github.com/alexedwards/scs/mssqlstore"
@@ -28,8 +28,10 @@ import (
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/alexedwards/scs/v2/memstore"
+	"github.com/debarbarinantoine/valkeystore"
 	"github.com/gomodule/redigo/redis"
 	"github.com/rs/zerolog"
+	"github.com/valkey-io/valkey-go"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 )
@@ -47,18 +49,18 @@ type Bingo struct {
 
 // Options represents the configuration options for the Bingo server.
 type Options struct {
-	
+
 	// ServerAddr specifies the address to listen on for the server.
 	//
 	// For example: ":8080".
 	ServerAddr string
-	
+
 	// Environment specifies the environment in which the server is running.
 	// It can be "development", "production", or "test".
 	//
 	// Only "production" sets the logger to output JSON format.
 	Environment string
-	
+
 	// UseRealIP specifies whether to use the RealIP middleware.
 	//
 	// If set to true, the RealIP middleware will be added to the middleware stack
@@ -66,6 +68,9 @@ type Options struct {
 	//
 	// Enable this when your server is behind proxies, load balancers, or CDNs.
 	UseRealIP bool
+
+	// ServerName specifies the name of the server in the logs.
+	ServerName string
 }
 
 // New returns a new Bingo instance with the default middleware stack:
@@ -74,150 +79,149 @@ type Options struct {
 //
 // Usage example:
 //
-// 	package main
+//	package main
 //
-// import (
-//	"fmt"
-//	"mime/multipart"
-//	"net/http"
-//	"time"
+//	import (
+//		"fmt"
+//		"mime/multipart"
+//		"net/http"
+//		"time"
 //
-//	"github.com/debarbarinantoine/bingo"
-//	"github.com/debarbarinantoine/bingo/binder"
-//	"github.com/debarbarinantoine/bingo/jwtkit"
-//	"github.com/debarbarinantoine/bingo/middleware"
+//		"github.com/debarbarinantoine/bingo"
+//		"github.com/debarbarinantoine/bingo/binder"
+//		"github.com/debarbarinantoine/bingo/jwtkit"
+//		"github.com/debarbarinantoine/bingo/middleware"
 //
-//	"github.com/rs/zerolog/hlog"
-// )
-//
-// // Publication represents a nested struct in the multipart data.
-// type Publication struct {
-//	Title string    `multipart:"title" json:"title" validate:"required,min=2,max=255"`
-//	Score float64   `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
-//	Date  time.Time `multipart:"date" json:"date" validate:"required"`
-// }
-//
-// // Info represents another nested struct, containing a slice of Publication.
-// type Info struct {
-//	Id           uint          `multipart:"id" json:"id" validate:"required,gt=0"`
-//	Publications []Publication `multipart:"publications" json:"publications" validate:"required,dive"`
-// }
-//
-// // Data shows how to bind various data types from different request sources.
-// //
-// // The `multipart` tag is used for multipart form data.
-// // The `cookie`, `header`, `param`, and `query` tags are for other request sources.
-// //
-// // The `validate` tag is used for data validation
-// // (see the go-playground/validator/v10 documentation for more details).
-// type Data struct {
-//	Session   string                `cookie:"session" json:"session" validate:"required,uuid"`
-//	CSRFToken string                `header:"x-csrf-token" json:"x-csrf-token"`
-//	Id        uint                  `param:"id" json:"id" validate:"required,gt=0"`
-//	Name      string                `query:"name" json:"name" validate:"required,min=2,max=100"`
-//	Age       int                   `multipart:"age" json:"age" validate:"required,gt=0,lte=120"`
-//	IsAdmin   bool                  `multipart:"is_admin" json:"is_admin"`
-//	Score     float64               `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
-//	Info      Info                  `multipart:"info" json:"info" validate:"required,dive"`
-//	File      *multipart.FileHeader `multipart:"file" json:"file"`
-// }
-//
-// // ping is a handler for a common route without data.
-// func ping(w http.ResponseWriter, r *http.Request) {
-//	// Respond to the client with a JSON message using the bingo.Json helper and bingo.H type (shortcut for map[string]any).
-//	bingo.Json(r, w, bingo.H{"message": "pong"}, http.StatusOK)
-// }
-//
-// // handler processes the bound and verified data and sends a JSON response.
-// func handler(w http.ResponseWriter, r *http.Request) {
-//	// Retrieve the bound data from the request context.
-//	data, ok := bingo.GetCtxData(r.Context(), "data").(*Data)
-//	if !ok {
-//		// Return an `Internal Server Error` with the bingo.ServerError helper.
-//		bingo.ServerError(r, w, fmt.Errorf("no data found in context"), "no data")
-//		return
-//	}
-//
-//	// Log at the info level with the data set by the Log middleware and the following message.
-//	hlog.FromRequest(r).Info().Msg("Request received successfully")
-//
-//	// Check if a file was uploaded and log its details.
-//	if data.File != nil {
-//		hlog.FromRequest(r).Info().
-//			Int64("file_size", data.File.Size).
-//			Str("file_name", data.File.Filename).
-//			Msg("File uploaded successfully")
-//	} else {
-//		hlog.FromRequest(r).Error().Msg("No file uploaded")
-//	}
-//
-//	// Respond to the client with the bound data in JSON format.
-//	bingo.Json(r, w, data, http.StatusOK)
-// }
-//
-// // admin is a handler for a restricted route.
-// func admin(w http.ResponseWriter, r *http.Request) {
-//	bingo.Json(r, w, bingo.H{"message": "hello admin!"}, http.StatusOK)
-// }
-//
-// func main() {
-//	// Initialize JWT configuration with a secret key.
-//	jwtConfig, err := jwtkit.NewConfigWithSecret(jwtkit.AlgorithmHS256, "|JwT53cr3T|", jwtkit.DefaultTokenResponseOptions())
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	// Initialize the server and chain builder methods to add middleware.
-//	// The "With..." methods use a builder pattern to configure the server.
-//	srv, err := bingo.New(bingo.Options{
-//		ServerAddr:  "localhost:8008",
-//		Environment: "development",
-//		UseRealIP:   true,
-//	}).
-//		WithLogMiddleware().
-//		WithJWT(jwtConfig)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	// Use global middlewares.
-//	srv.Router.Use(
-//		middleware.RedirectSlashes(),
-//		middleware.Timeout(time.Minute),
-//		middleware.ThrottleBacklog(100, 500, time.Minute),
-//		middleware.RateLimiterByIP(30, time.Minute),
+//		"github.com/rs/zerolog/hlog"
 //	)
 //
-//	// public endpoint with a URL parameter (id) that has a regex match.
-//	//
-//	// Uses the *Router.Post() method with the `bingo.WithBinderAndValidator()` functional option to bind and validate data.
-//	srv.Router.Post("/:id|\\d+", handler, bingo.WithBinderAndValidator(&Data{}, "data", binder.WithoutJSONBinder()))
-//
-//	// grouped routes that may have specific middlewares applied.
-//	srv.Router.Group(func(router *bingo.Router) {
-//
-//		// Add a middleware to the following routes onward
-//		// using the `router` instance specific to this group.
-//		router.Use(jwtkit.VerifyAndAuthenticateJWT())
-//
-//		// Restricted route, requires JWT authentication.
-//		// Uses the *Router.Get() method
-//		router.Get("/admin", admin)
-//
-//		// Any following route will be restricted by the JWT middleware.
-//		// ...
-//	})
-//
-//	// public endpoint, not affected by the group set before.
-//	// Uses the *Router.HandleFunc() method corresponding to the native http.HandleFunc method
-//	srv.Router.HandleFunc("/ping", ping, http.MethodGet)
-//
-//	// Start the server and listen for incoming requests.
-//	if err := srv.ListenAndServe(); err != nil {
-//		srv.Logger.Fatal().Err(err).Msg("Server error")
+//	// Publication represents a nested struct in the multipart data.
+//	type Publication struct {
+//		Title string    `multipart:"title" json:"title" validate:"required,min=2,max=255"`
+//		Score float64   `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+//		Date  time.Time `multipart:"date" json:"date" validate:"required"`
 //	}
-// }
 //
+//	// Info represents another nested struct, containing a slice of Publication.
+//	type Info struct {
+//		Id           uint          `multipart:"id" json:"id" validate:"required,gt=0"`
+//		Publications []Publication `multipart:"publications" json:"publications" validate:"required,dive"`
+//	}
+//
+//	// Data shows how to bind various data types from different request sources.
+//	//
+//	// The `multipart` tag is used for multipart form data.
+//	// The `cookie`, `header`, `param`, and `query` tags are for other request sources.
+//	//
+//	// The `validate` tag is used for data validation
+//	// (see the go-playground/validator/v10 documentation for more details).
+//	type Data struct {
+//		Session   string                `cookie:"session" json:"session" validate:"required,uuid"`
+//		CSRFToken string                `header:"x-csrf-token" json:"x-csrf-token"`
+//		Id        uint                  `param:"id" json:"id" validate:"required,gt=0"`
+//		Name      string                `query:"name" json:"name" validate:"required,min=2,max=100"`
+//		Age       int                   `multipart:"age" json:"age" validate:"required,gt=0,lte=120"`
+//		IsAdmin   bool                  `multipart:"is_admin" json:"is_admin"`
+//		Score     float64               `multipart:"score" json:"score" validate:"required,gte=0,lte=10"`
+//		Info      Info                  `multipart:"info" json:"info" validate:"required,dive"`
+//		File      *multipart.FileHeader `multipart:"file" json:"file"`
+//	}
+//
+//	// ping is a handler for a common route without data.
+//	func ping(w http.ResponseWriter, r *http.Request) {
+//		// Respond to the client with a JSON message using the bingo.Json helper and bingo.H type (shortcut for map[string]any).
+//		bingo.Json(r, w, bingo.H{"message": "pong"}, http.StatusOK)
+//	}
+//
+//	// handler processes the bound and verified data and sends a JSON response.
+//	func handler(w http.ResponseWriter, r *http.Request) {
+//		// Retrieve the bound data from the request context.
+//		data, ok := bingo.GetCtxData(r.Context(), "data").(*Data)
+//		if !ok {
+//			// Return an `Internal Server Error` with the bingo.ServerError helper.
+//			bingo.ServerError(r, w, fmt.Errorf("no data found in context"), "no data")
+//			return
+//		}
+//
+//		// Log at the info level with the data set by the Log middleware and the following message.
+//		hlog.FromRequest(r).Info().Msg("Request received successfully")
+//
+//		// Check if a file was uploaded and log its details.
+//		if data.File != nil {
+//			hlog.FromRequest(r).Info().
+//				Int64("file_size", data.File.Size).
+//				Str("file_name", data.File.Filename).
+//				Msg("File uploaded successfully")
+//		} else {
+//			hlog.FromRequest(r).Error().Msg("No file uploaded")
+//		}
+//
+//		// Respond to the client with the bound data in JSON format.
+//		bingo.Json(r, w, data, http.StatusOK)
+//	}
+//
+//	// admin is a handler for a restricted route.
+//	func admin(w http.ResponseWriter, r *http.Request) {
+//		bingo.Json(r, w, bingo.H{"message": "hello admin!"}, http.StatusOK)
+//	}
+//
+//	func main() {
+//		// Initialize JWT configuration with a secret key.
+//		jwtConfig, err := jwtkit.NewConfigWithSecret(jwtkit.AlgorithmHS256, "|JwT53cr3T|", jwtkit.DefaultTokenResponseOptions())
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		// Initialize the server and chain builder methods to add middleware.
+//		// The "With..." methods use a builder pattern to configure the server.
+//		srv, err := bingo.New(bingo.Options{
+//			ServerAddr:  "localhost:8008",
+//			Environment: "development",
+//			UseRealIP:   true,
+//		}).
+//			WithLogMiddleware().
+//			WithJWT(jwtConfig)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		// Use global middlewares.
+//		srv.Router.Use(
+//			middleware.RedirectSlashes(),
+//			middleware.Timeout(time.Minute),
+//			middleware.ThrottleBacklog(100, 500, time.Minute),
+//			middleware.RateLimiterByIP(30, time.Minute),
+//		)
+//
+//		// public endpoint with a URL parameter (id) that has a regex match.
+//		//
+//		// Uses the *Router.Post() method with the `bingo.WithBinderAndValidator()` functional option to bind and validate data.
+//		srv.Router.Post("/:id|\\d+", handler, bingo.WithBinderAndValidator(&Data{}, "data", binder.WithoutJSONBinder()))
+//
+//		// grouped routes that may have specific middlewares applied.
+//		srv.Router.Group(func(router *bingo.Router) {
+//
+//			// Add a middleware to the following routes onward
+//			// using the `router` instance specific to this group.
+//			router.Use(jwtkit.VerifyAndAuthenticateJWT())
+//
+//			// Restricted route, requires JWT authentication.
+//			// Uses the *Router.Get() method
+//			router.Get("/admin", admin)
+//
+//			// Any following route will be restricted by the JWT middleware.
+//			// ...
+//		})
+//
+//		// public endpoint, not affected by the group set before.
+//		// Uses the *Router.HandleFunc() method corresponding to the native http.HandleFunc method
+//		srv.Router.HandleFunc("/ping", ping, http.MethodGet)
+//
+//		// Start the server and listen for incoming requests.
+//		if err := srv.ListenAndServe(); err != nil {
+//			srv.Logger.Fatal().Err(err).Msg("Server error")
+//		}
+//	}
 func New(options Options) *Bingo {
 	var output io.Writer = os.Stdout
 	if options.Environment == "" {
@@ -226,22 +230,31 @@ func New(options Options) *Bingo {
 	if options.Environment != "production" {
 		output = zerolog.ConsoleWriter{Out: os.Stdout}
 	}
+
 	// Initialize the zerolog logger
 	log := zerolog.New(output).With().
 		Timestamp().
 		Str("addr", options.ServerAddr).
 		Logger()
-	
+
+	if options.ServerName != "" {
+		log = zerolog.New(output).With().
+			Timestamp().
+			Str("server", options.ServerName).
+			Str("addr", options.ServerAddr).
+			Logger()
+	}
+
 	// Initialize a new router
 	r := NewRouter()
 	r.NotFound = helpers.NotFoundHandler
 	r.MethodNotAllowed = helpers.MethodNotAllowedHandler
-	
+
 	// Apply the RealIP middleware if UseRealIP is true
 	if options.UseRealIP {
 		r.Use(middleware.RealIP())
 	}
-	
+
 	return &Bingo{
 		environment: options.Environment,
 		wg:          new(sync.WaitGroup),
@@ -281,47 +294,47 @@ func (b *Bingo) ListenAndServe() error {
 		b.Router.PrintRoutes()
 		fmt.Println()
 	}
-	
+
 	// setting the error channel to shut the server down
 	shutdownError := make(chan error)
-	
+
 	go func() {
-		
+
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		s := <-quit
-		
+
 		b.Logger.Info().Str("signal", s.String()).Msg("Shutting server down")
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		err := b.Server.Shutdown(ctx)
 		if err != nil {
 			shutdownError <- err
 		}
-		
+
 		b.Logger.Info().Msg("Completing background tasks")
-		
+
 		b.wg.Wait()
 		shutdownError <- nil
 	}()
-	
+
 	b.Logger.Info().Str("env", b.environment).Msg("Starting server")
-	
+
 	// run the server
 	err := b.Server.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
-	
+
 	err = <-shutdownError
 	if err != nil {
 		return err
 	}
-	
-	b.Logger.Info().Msg("Portfolio server shutdown")
-	
+
+	b.Logger.Info().Msg("Server shutdown")
+
 	return nil
 }
 
@@ -378,11 +391,11 @@ func (b *Bingo) WithJWT(config *jwtkit.Config) (*Bingo, error) {
 	if b.JwtConfig != nil || b.SessionManager != nil {
 		return b, nil
 	}
-	
+
 	// Initialize a new JWTAuth instance with the specified secret and algorithm
 	b.JwtConfig = config
 	b.Router.Use(jwtkit.SetJWT(config))
-	
+
 	return b, nil
 }
 
@@ -391,11 +404,12 @@ type SessionOptions struct {
 	DBPool      any
 	IdleTimeout time.Duration
 	Lifetime    time.Duration
-	
+
 	// Store specifies the session store to use.
 	// Use sessions.Stores struct to specify the session store to use.
 	Store  enum.SessionStore
 	Cookie scs.SessionCookie
+	Prefix string
 }
 
 // NewSessionOptions creates a new SessionOptions instance with default values.
@@ -414,6 +428,9 @@ func NewSessionOptions() SessionOptions {
 		},
 	}
 }
+
+// SessionStores is the enumeration containing all available session stores for SessionOptions
+var SessionStores = sessions.Stores
 
 func assignSessionOptions(opt SessionOptions, sessionManager *scs.SessionManager) {
 	if opt.IdleTimeout != 0 {
@@ -448,21 +465,20 @@ func assignSessionOptions(opt SessionOptions, sessionManager *scs.SessionManager
 //	if err != nil {
 //		panic(err)
 //	}
-//
 func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 	var err error
-	
+
 	// Check if session manager or Config auth are already initialized
 	if b.SessionManager != nil || b.JwtConfig != nil {
 		return b, nil
 	}
-	
-	// Initialize a new session manager and configure it to use redisstore as the session store.
+
+	// Initialize a new session manager and configure it to use the session store given in the options.
 	sessionManager := scs.New()
 	assignSessionOptions(opt, sessionManager)
-	
+
 	switch opt.Store {
-	
+
 	case sessions.Stores.GORM:
 		gormConn, ok := opt.DBPool.(*gorm.DB)
 		if !ok {
@@ -473,15 +489,19 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 			b.Logger.Error().Err(err).Msg("Failed to initialize session manager")
 			return nil, err
 		}
-	
+
 	case sessions.Stores.Redis:
 		redisConn, ok := opt.DBPool.(*redis.Pool)
 		if !ok {
 			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
 			return nil, ErrInvalidDBPool
 		}
-		sessionManager.Store = redisstore.New(redisConn)
-	
+		if opt.Prefix != "" {
+			sessionManager.Store = redisstore.NewWithPrefix(redisConn, opt.Prefix)
+		} else {
+			sessionManager.Store = redisstore.New(redisConn)
+		}
+
 	case sessions.Stores.PostgreSQL:
 		postgresConn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
@@ -489,7 +509,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 			return nil, ErrInvalidDBPool
 		}
 		sessionManager.Store = postgresstore.New(postgresConn)
-	
+
 	case sessions.Stores.MySQL:
 		mysqlConn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
@@ -497,7 +517,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 			return nil, ErrInvalidDBPool
 		}
 		sessionManager.Store = mysqlstore.New(mysqlConn)
-	
+
 	case sessions.Stores.SQLite3:
 		sqlite3Conn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
@@ -505,7 +525,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 			return nil, ErrInvalidDBPool
 		}
 		sessionManager.Store = sqlite3store.New(sqlite3Conn)
-	
+
 	case sessions.Stores.MongoDB:
 		mongoConn, ok := opt.DBPool.(*mongo.Database)
 		if !ok {
@@ -513,7 +533,7 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 			return nil, ErrInvalidDBPool
 		}
 		sessionManager.Store = mongodbstore.New(mongoConn)
-	
+
 	case sessions.Stores.MSSQL:
 		mssqlConn, ok := opt.DBPool.(*sql.DB)
 		if !ok {
@@ -521,15 +541,27 @@ func (b *Bingo) WithSessions(opt SessionOptions) (*Bingo, error) {
 			return nil, ErrInvalidDBPool
 		}
 		sessionManager.Store = mssqlstore.New(mssqlConn)
-	
+
+	case sessions.Stores.Valkey:
+		valkeyClient, ok := opt.DBPool.(valkey.Client)
+		if !ok {
+			b.Logger.Error().Err(ErrInvalidDBPool).Msg("opt.DBPool is not a valid database connection")
+			return nil, ErrInvalidDBPool
+		}
+		if opt.Prefix != "" {
+			sessionManager.Store = valkeystore.NewWithPrefix(valkeyClient, opt.Prefix)
+		} else {
+			sessionManager.Store = valkeystore.New(valkeyClient)
+		}
+
 	// If no valid store is specified or if InMemory is specified, use the default in-memory store.
 	default:
 		sessionManager.Store = memstore.New()
 	}
-	
+
 	// Set the session manager on the Bingo instance and apply the dependency injection middleware.
 	b.SessionManager = sessionManager
 	b.Router.Use(sessions.SetSessionManager(sessionManager))
-	
+
 	return b, nil
 }

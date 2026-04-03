@@ -4,7 +4,7 @@
 
 BinGo is a highly flexible and extensible web library for Go, designed for rapid development of robust and scalable web services. It's built on idiomatic Go principles and provides a clear, modular architecture with sensible defaults.
 
-> Requires **Go 1.24** or higher.
+> Requires **Go 1.25** or higher.
 
 It uses widely adopted libraries like:
 - `zerolog` for logging

@@ -33,3 +33,5 @@
       value: "sqlite3store"
     - key: MongoDB
       value: "mongodbstore"
+    - key: Valkey
+      value: "valkeystore"
