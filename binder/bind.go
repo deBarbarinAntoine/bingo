@@ -183,6 +183,11 @@ func bindRecursive(v reflect.Value, tag enum.Tag, data map[string]any) error {
 		if !ok {
 			continue
 		}
+		
+		if _, isPlaceholder := mapValue.(struct{}); isPlaceholder {
+			continue
+		}
+		
 		if !fieldValue.CanSet() {
 			continue
 		}
